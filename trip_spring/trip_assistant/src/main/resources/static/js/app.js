@@ -1,161 +1,4 @@
-const MOCK_FLAG_KEY = 'trip-assistant-mock';
-const MOCK_CODE = '123456';
-
-const mockState = {
-    sentCode: MOCK_CODE,
-    userEmail: 'demo@example.com'
-};
-
-const mockData = {
-    overview: {
-        city: '北京',
-        startDate: '2025-11-03',
-        endDate: '2025-11-05',
-        suggestion: '天气较好，适合户外活动。建议穿舒适步行鞋并注意早晚温差。'
-    },
-    budget: {
-        ticketCost: 150,
-        hotelCost: 1200,
-        foodCost: 540,
-        transportCost: 300,
-        totalCost: 2190
-    },
-    mapPoints: [
-        {id: 1, name: '北京站', x: 38, y: 17},
-        {id: 2, name: '什刹海', x: 25, y: 27},
-        {id: 3, name: '故宫', x: 44, y: 34},
-        {id: 4, name: '北海公园', x: 22, y: 33},
-        {id: 5, name: '中国国家博物馆', x: 48, y: 48},
-        {id: 6, name: '北京欢乐谷', x: 72, y: 42}
-    ],
-    weather: [
-        {date: '11-03', condition: '晴', temp: '11~19C', tip: '紫外线较强，注意防晒'},
-        {date: '11-04', condition: '多云', temp: '10~17C', tip: '适合步行游览'},
-        {date: '11-05', condition: '小雨', temp: '8~14C', tip: '建议携带雨具'}
-    ],
-    dailyPlans: [
-        {
-            dayIndex: 1,
-            date: '2025-11-03',
-            description: '游览北海公园与什刹海，体验老北京的自然与历史文化。',
-            transport: '公共交通',
-            hotel: '经济型酒店',
-            spots: [
-                {
-                    order: 1,
-                    name: '北海公园',
-                    address: '文津街1号',
-                    minutes: 120,
-                    ticketPrice: 20,
-                    desc: '历史悠久的皇家园林，可赏湖光与古建。',
-                    imageUrl: 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=900&q=80'
-                },
-                {
-                    order: 2,
-                    name: '什刹海-后海',
-                    address: '羊房胡同甲23-3号',
-                    minutes: 90,
-                    ticketPrice: 0,
-                    desc: '胡同与水岸融合，适合傍晚散步和拍照。',
-                    imageUrl: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?auto=format&fit=crop&w=900&q=80'
-                }
-            ],
-            hotelSuggestion: {
-                name: '北京科兴宾馆',
-                address: '培新街安国门写楼',
-                priceRange: '300-500元',
-                type: '经济型酒店',
-                rating: 4.0,
-                distance: '距景点约5公里'
-            },
-            meals: [
-                {type: '早餐', recommendation: '豆浆油条和包子'},
-                {type: '午餐', recommendation: '什刹海附近家常菜馆'},
-                {type: '晚餐', recommendation: '后海夜市小吃'}
-            ]
-        },
-        {
-            dayIndex: 2,
-            date: '2025-11-04',
-            description: '白天参观博物馆，晚间前往欢乐谷体验夜景。',
-            transport: '地铁+打车',
-            hotel: '经济型酒店',
-            spots: [
-                {
-                    order: 1,
-                    name: '中国国家博物馆',
-                    address: '东长安街16号',
-                    minutes: 180,
-                    ticketPrice: 0,
-                    desc: '馆藏丰富，建议提前预约。',
-                    imageUrl: 'https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&w=900&q=80'
-                },
-                {
-                    order: 2,
-                    name: '北京欢乐谷',
-                    address: '东四环小武基北路',
-                    minutes: 220,
-                    ticketPrice: 299,
-                    desc: '夜场项目多，适合朋友同游。',
-                    imageUrl: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=900&q=80'
-                }
-            ],
-            hotelSuggestion: {
-                name: '东城区轻居酒店',
-                address: '崇文门外大街',
-                priceRange: '320-480元',
-                type: '舒适型酒店',
-                rating: 4.3,
-                distance: '距地铁站约600米'
-            },
-            meals: [
-                {type: '早餐', recommendation: '酒店简餐'},
-                {type: '午餐', recommendation: '博物馆周边套餐'},
-                {type: '晚餐', recommendation: '欢乐谷园区简餐'}
-            ]
-        },
-        {
-            dayIndex: 3,
-            date: '2025-11-05',
-            description: '探索森林湿地公园，休闲收尾。',
-            transport: '公共交通',
-            hotel: '经济型酒店',
-            spots: [
-                {
-                    order: 1,
-                    name: '南苑森林湿地公园',
-                    address: '公槐桥公园庄',
-                    minutes: 150,
-                    ticketPrice: 0,
-                    desc: '水域与林地景观丰富，适合慢节奏游览。',
-                    imageUrl: 'https://images.unsplash.com/photo-1472396961693-142e6e269027?auto=format&fit=crop&w=900&q=80'
-                },
-                {
-                    order: 2,
-                    name: '凉水河-榴香森林公园',
-                    address: '金桥东街与京庄路辅路交叉口东南200米',
-                    minutes: 120,
-                    ticketPrice: 0,
-                    desc: '植被良好，适合休闲步行与拍照。',
-                    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=900&q=80'
-                }
-            ],
-            hotelSuggestion: {
-                name: '返程日无需续住',
-                address: '可根据返程时间灵活安排',
-                priceRange: '-',
-                type: '无',
-                rating: 0,
-                distance: '-'
-            },
-            meals: [
-                {type: '早餐', recommendation: '酒店早餐'},
-                {type: '午餐', recommendation: '公园周边简餐'},
-                {type: '晚餐', recommendation: '返程途中用餐'}
-            ]
-        }
-    ]
-};
+const TOKEN_KEY = 'trip-assistant-token';
 
 let plannerTimer = null;
 
@@ -167,22 +10,40 @@ function fail(code, message) {
     return {code, message, data: null};
 }
 
-function useMockApi() {
-    const queryValue = new URLSearchParams(window.location.search).get('mock');
-    if (queryValue === '1') {
-        localStorage.setItem(MOCK_FLAG_KEY, '1');
-        return true;
-    }
-    if (queryValue === '0') {
-        localStorage.setItem(MOCK_FLAG_KEY, '0');
-        return false;
-    }
-    const saved = localStorage.getItem(MOCK_FLAG_KEY);
-    if (saved === null) {
-        localStorage.setItem(MOCK_FLAG_KEY, '0');
-        return false;
-    }
-    return saved === '1';
+/**
+ * 保存登录令牌到本地存储。
+ * @param {string} token JWT令牌字符串
+ * @returns {void} 无返回值
+ */
+function setToken(token) {
+    localStorage.setItem(TOKEN_KEY, token);
+}
+
+/**
+ * 从本地存储读取登录令牌。
+ * @param {void} 无参数
+ * @returns {string|null} JWT令牌或空值
+ */
+function getToken() {
+    return localStorage.getItem(TOKEN_KEY);
+}
+
+/**
+ * 清理本地存储中的登录令牌。
+ * @param {void} 无参数
+ * @returns {void} 无返回值
+ */
+function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+}
+
+/**
+ * 判断当前请求是否需要自动携带token。
+ * @param {string} url 请求路径
+ * @returns {boolean} true表示需要携带，false表示无需携带
+ */
+function shouldAttachToken(url) {
+    return url !== '/api/auth/send-code' && url !== '/api/auth/login';
 }
 
 function normalizeResult(payload) {
@@ -199,85 +60,21 @@ function normalizeResult(payload) {
     };
 }
 
-function tryParseBody(options) {
-    if (!options || !options.body) {
-        return {};
-    }
-    try {
-        return JSON.parse(options.body);
-    } catch (err) {
-        return {};
-    }
-}
-
-async function mockApiFetch(url, options) {
-    const method = ((options && options.method) || 'GET').toUpperCase();
-    const body = tryParseBody(options);
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (url === '/api/auth/send-code' && method === 'POST') {
-        if (!emailRegex.test((body.email || '').trim())) {
-            return fail(400, '邮箱格式不正确');
-        }
-        mockState.userEmail = body.email.trim();
-        return ok({email: mockState.userEmail}, '验证码已发送，演示验证码为 123456');
-    }
-
-    if (url === '/api/auth/login' && method === 'POST') {
-        const email = (body.email || '').trim();
-        if (!emailRegex.test(email)) {
-            return fail(400, '邮箱格式不正确');
-        }
-        if ((body.code || '').trim() !== mockState.sentCode) {
-            return fail(400, '验证码错误，请输入 123456');
-        }
-        localStorage.setItem('trip-assistant-user', email);
-        return ok({email}, '登录成功');
-    }
-
-    if (url === '/api/auth/logout' && method === 'POST') {
-        localStorage.removeItem('trip-assistant-user');
-        return ok(null, '退出成功');
-    }
-
-    if (url === '/api/auth/me' && method === 'GET') {
-        const savedEmail = localStorage.getItem('trip-assistant-user');
-        if (!savedEmail) {
-            return fail(401, '请先登录');
-        }
-        return ok({email: savedEmail});
-    }
-
-    if (!localStorage.getItem('trip-assistant-user')) {
-        return fail(401, '请先登录');
-    }
-
-    if (url === '/api/trip/overview' && method === 'GET') {
-        return ok(mockData.overview);
-    }
-    if (url === '/api/trip/budget' && method === 'GET') {
-        return ok(mockData.budget);
-    }
-    if (url === '/api/trip/map-points' && method === 'GET') {
-        return ok(mockData.mapPoints);
-    }
-    if (url === '/api/trip/daily-plans' && method === 'GET') {
-        return ok(mockData.dailyPlans);
-    }
-    if (url === '/api/trip/weather' && method === 'GET') {
-        return ok(mockData.weather);
-    }
-
-    return fail(404, `未找到接口: ${method} ${url}`);
-}
-
 async function realApiFetch(url, options) {
     try {
+        // 构造默认请求头，并在需要时拼接Authorization令牌。
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+
+        const token = getToken();
+        if (token && shouldAttachToken(url)) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
         const response = await fetch(url, {
             credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers,
             ...options
         });
 
@@ -292,6 +89,10 @@ async function realApiFetch(url, options) {
         }
 
         const result = normalizeResult(payload);
+        // 401表示登录态失效，需要清理本地token。
+        if (response.status === 401) {
+            clearToken();
+        }
         if (!response.ok && result.code === 0) {
             return fail(response.status, result.message || `请求失败: ${response.status}`);
         }
@@ -302,9 +103,6 @@ async function realApiFetch(url, options) {
 }
 
 async function apiFetch(url, options) {
-    if (useMockApi()) {
-        return mockApiFetch(url, options);
-    }
     return realApiFetch(url, options);
 }
 
@@ -377,6 +175,10 @@ function bindLoginPage() {
         if (result.code !== 0) {
             setMessage(result.message, true);
             return;
+        }
+        // 登录成功后持久化token，供后续接口鉴权使用。
+        if (result.data && result.data.token) {
+            setToken(result.data.token);
         }
         setMessage(result.message, false);
         window.location.href = '/trip/dashboard';
@@ -628,22 +430,6 @@ function calcTripDays(startDate, endDate) {
     return Math.floor(diff / (24 * 60 * 60 * 1000)) + 1;
 }
 
-function applyPlannerToMockData(formData) {
-    const days = calcTripDays(formData.startDate, formData.endDate);
-
-    mockData.overview.city = formData.city;
-    mockData.overview.startDate = formData.startDate;
-    mockData.overview.endDate = formData.endDate;
-    mockData.overview.suggestion = `${formData.city} ${days || '-'} 天行程已更新。交通偏好：${formData.transport}；住宿偏好：${formData.hotel}。${formData.extra || '建议提前预约热门景点。'}`;
-
-    mockData.dailyPlans.forEach((day, index) => {
-        day.transport = formData.transport;
-        day.hotel = formData.hotel;
-        day.date = shiftDate(formData.startDate, index);
-        day.description = `第${day.dayIndex}天在${formData.city}游览。${formData.extra || '行程节奏以舒适休闲为主。'}`;
-    });
-}
-
 function shiftDate(baseDate, offset) {
     const date = new Date(baseDate);
     if (Number.isNaN(date.getTime())) {
@@ -706,7 +492,6 @@ function bindPlanner() {
             clearInterval(plannerTimer);
             plannerTimer = null;
 
-            applyPlannerToMockData(formData);
             await Promise.all([loadOverview(), loadBudget(), loadMap(), loadDailyPlans(), loadWeather()]);
 
             els.generateStatus.textContent = `已完成：${formData.city} ${tripDays} 天行程已生成`;

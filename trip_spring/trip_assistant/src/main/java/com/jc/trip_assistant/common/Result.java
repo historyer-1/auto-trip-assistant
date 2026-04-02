@@ -32,6 +32,9 @@ public class Result<T> {
     public static <T> Result<T> success(T data) {
         return new Result<>(0, "success", data);
     }
+    public static <T> Result<T> success(String message) {
+        return new Result<>(0, message, null);
+    }
 
     /**
      * 成功响应（自定义消息和数据）
