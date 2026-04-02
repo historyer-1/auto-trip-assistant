@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅行计划 - 智能旅行助手</title>
+    <link rel="stylesheet" th:href="@{/css/main.css}" href="/css/main.css">
+</head>
+<body>
+<div class="page dashboard-page">
+    <div class="toolbar">
+        <button id="backHomeBtn" class="btn" type="button">返回首页</button>
+        <div class="toolbar-right">
+            <button id="editTripBtn" class="btn" type="button">编辑行程</button>
+            <button id="exportTripBtn" class="btn" type="button">导出行程</button>
+            <button id="logoutBtn" class="btn" type="button">退出登录</button>
+        </div>
+    </div>
+
+    <div class="layout">
+        <aside class="sidebar card nav-card">
+            <h3>行程目录</h3>
+            <a href="#overview">行程概览</a>
+            <a href="#budget">预算明细</a>
+            <a href="#map">景点地图</a>
+            <a href="#daily">每日行程</a>
+            <a href="#weather">天气信息</a>
+        </aside>
+
+        <main class="content">
+            <section id="planner" class="card section planner-section">
+                <h2>行程参数</h2>
+                <div class="planner-grid">
+                    <div class="form-row">
+                        <label for="cityInput">目的地城市</label>
+                        <input id="cityInput" type="text" value="北京" placeholder="例如：北京">
+                    </div>
+                    <div class="form-row">
+                        <label for="startDateInput">开始日期</label>
+                        <input id="startDateInput" type="date" value="2025-11-03">
+                    </div>
+                    <div class="form-row">
+                        <label for="endDateInput">结束日期</label>
+                        <input id="endDateInput" type="date" value="2025-11-05">
+                    </div>
+                    <div class="form-row">
+                        <label for="transportSelect">交通方式</label>
+                        <select id="transportSelect">
+                            <option value="公共交通">公共交通</option>
+                            <option value="地铁+打车">地铁+打车</option>
+                            <option value="自驾">自驾</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="hotelSelect">住宿偏好</label>
+                        <select id="hotelSelect">
+                            <option value="经济型酒店">经济型酒店</option>
+                            <option value="舒适型酒店">舒适型酒店</option>
+                            <option value="高档型酒店">高档型酒店</option>
+                        </select>
+                    </div>
+                    <div class="form-row full-width">
+                        <label for="extraInput">额外要求</label>
+                        <textarea id="extraInput" rows="2" placeholder="例如：老人同行、避免长距离步行、偏好自然风光"></textarea>
+                    </div>
+                </div>
+
+                <div class="planner-actions">
+                    <button id="generateBtn" class="btn btn-primary" type="button">生成旅行计划</button>
+                    <div id="generateStatus" class="muted">等待生成</div>
+                </div>
+
+                <div class="progress-wrap" aria-label="生成进度">
+                    <div id="progressBar" class="progress-bar" style="width:0%;"></div>
+                </div>
+            </section>
+
+            <section class="hero-grid">
+                <section id="overview" class="card section">
+                    <h2>行程概览</h2>
+                    <div class="muted">当前登录：<span th:text="${email}">demo@example.com</span></div>
+                    <div id="overviewBox" class="overview-box"></div>
+                </section>
+
+                <section id="map" class="card section">
+                    <h2>景点地图</h2>
+                    <div class="map-box" id="mapBox"></div>
+                </section>
+            </section>
+
+            <section id="budget" class="card section">
+                <h2>预算明细</h2>
+                <div id="budgetBox" class="budget-grid"></div>
+            </section>
+
+            <section id="daily" class="card section">
+                <h2>每日行程</h2>
+                <div id="dailyBox"></div>
+            </section>
+
+            <section id="weather" class="card section">
+                <h2>天气信息</h2>
+                <div id="weatherBox" class="weather-grid"></div>
+            </section>
+        </main>
+    </div>
+</div>
+<script th:src="@{/js/app.js}" src="/js/app.js"></script>
+</body>
+</html>
+
