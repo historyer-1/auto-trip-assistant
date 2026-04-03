@@ -4,3 +4,8 @@ uvicorn[standard]==0.39.0
 pydantic==2.12.5
 httpx==0.28.1
 mcp==1.26.0
+langchain==1.0.3
+langchain-core==1.2.19
+langchain-openai==1.0.3
+langchain-community==0.4.1
+langchain-mcp-adapters==0.2.2

@@ -1,7 +1,0 @@
-# Ignore sensitive local secrets
-agentService/api_keys.py
-
-# Ignore Python cache and compiled artifacts
-__pycache__/
-*.py[cod]
-*$py.class

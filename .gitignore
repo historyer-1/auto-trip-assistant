@@ -1,0 +1,48 @@
+# =========================
+# OS and generic temporary files
+# =========================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+
+# =========================
+# Python project (python_agent)
+# =========================
+python_agent/__pycache__/
+python_agent/**/*.py[cod]
+python_agent/*$py.class
+python_agent/.pytest_cache/
+python_agent/.mypy_cache/
+python_agent/.ruff_cache/
+python_agent/.venv/
+python_agent/venv/
+python_agent/.env
+python_agent/.env.*
+
+# Local secrets (do not upload)
+python_agent/agentService/api_keys.py
+
+# =========================
+# Spring Boot project (trip_spring/trip_assistant)
+# =========================
+trip_spring/trip_assistant/target/
+trip_spring/trip_assistant/.mvn/wrapper/maven-wrapper.jar
+
+# Local secret configs (do not upload)
+trip_spring/trip_assistant/src/main/resources/application.yaml
+trip_spring/trip_assistant/src/main/resources/application-*.yaml
+trip_spring/trip_assistant/src/main/resources/application-*.yml
+trip_spring/trip_assistant/src/main/resources/application-*.properties
+
+# =========================
+# IDE files
+# =========================
+.idea/
+*.iml
+
+# Keep sharable VS Code launch configs, ignore user-private variants
+.vscode
+
+prompt.txt
