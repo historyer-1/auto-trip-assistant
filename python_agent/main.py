@@ -2,6 +2,7 @@ import asyncio
 
 from agentService.attraction_search_agent import AttractionSearchAgent
 from agentService.mcp_connector import McpConnector
+from entity.BasicClass import TripRequest
 
 
 async def _run_once(user_input: str) -> None:
@@ -19,7 +20,18 @@ async def _run_once(user_input: str) -> None:
     try:
         # 复用启动阶段加载的工具创建 Agent。
         agent = AttractionSearchAgent(tools=connector.tools)
-        result = await agent.ainvoke(user_input=user_input)
+        # 组装最小可用请求对象，便于命令行快速验证搜索链路。
+        request = TripRequest(
+            city="北京",
+            start_date="2026-04-10",
+            end_date="2026-04-12",
+            preference="历史文化",
+            accommodation="市中心",
+            transportation="地铁",
+            budget=2000,
+            user_input=user_input,
+        )
+        result = await agent.ainvoke(request=request)
         print(result)
     finally:
         await connector.close()

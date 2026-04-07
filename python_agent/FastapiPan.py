@@ -7,24 +7,14 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 
-from agentService.attraction_search_agent import AttractionSearchAgent
+from agentService.trip_orchestrator_agent import TripOrchestratorAgent
 from agentService.mcp_connector import McpConnector
+from entity.BasicClass import TripPlan, TripRequest
 
 logger = logging.getLogger(__name__)
 
 
-class AgentQueryRequest(BaseModel):
-	"""智能体请求体。"""
-
-	user_input: str = Field(..., description="用户输入的旅行需求")
-
-
-class AgentQueryResponse(BaseModel):
-	"""智能体响应体。"""
-
-	answer: str = Field(..., description="智能体生成的推荐内容")
 
 
 @asynccontextmanager
@@ -34,7 +24,7 @@ async def lifespan(app: FastAPI):
 	启动阶段：
 	1. 创建并连接 McpConnector；
 	2. 预加载 MCP 工具；
-	3. 预创建 AttractionSearchAgent；
+	3. 预创建 TripOrchestratorAgent；
 	4. 挂载到 app.state 供路由复用。
 
 	关闭阶段：
@@ -50,7 +40,7 @@ async def lifespan(app: FastAPI):
 	await connector.connect()
 
 	app.state.mcp_connector = connector
-	app.state.agent = AttractionSearchAgent(tools=connector.tools)
+	app.state.agent = TripOrchestratorAgent(tools=connector.tools)
 
 	try:
 		yield
@@ -71,25 +61,25 @@ async def health() -> dict[str, str]:
 	return {"status": "ok"}
 
 
-@app.post("/agent/query", response_model=AgentQueryResponse)
-async def query_agent(payload: AgentQueryRequest) -> AgentQueryResponse:
+@app.post("/agent/query", response_model=TripPlan)
+async def query_agent(payload: TripRequest) -> TripPlan:
 	"""调用预创建的 Agent 执行查询。
 
 	参数:
 		payload: 请求体，包含用户输入。
 
 	返回值:
-		AgentQueryResponse: 智能体回复。
+		TripPlan: 结构化的行程规划结果。
 	"""
 	# 路由层不持有任何连接状态，仅从 app.state 获取已创建实例。
-	agent: AttractionSearchAgent | None = getattr(app.state, "agent", None)
+	agent: TripOrchestratorAgent | None = getattr(app.state, "agent", None)
 	if agent is None:
 		raise HTTPException(status_code=503, detail="Agent 尚未就绪")
 
 	try:
 		# 为每个请求增加超时保护，避免单请求长时间占用工作线程。
-		answer = await asyncio.wait_for(agent.ainvoke(payload.user_input), timeout=45)
-		return AgentQueryResponse(answer=answer)
+		answer = await asyncio.wait_for(agent.ainvoke(payload), timeout=600)
+		return answer
 	except TimeoutError as exc:
 		raise HTTPException(status_code=504, detail="请求超时，请稍后重试") from exc
 	except Exception as exc:

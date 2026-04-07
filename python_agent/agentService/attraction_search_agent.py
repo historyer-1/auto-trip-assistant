@@ -6,15 +6,13 @@ from typing import Any
 
 from pydantic import SecretStr
 
-# 这是 OpenAI 聊天模型的 LangChain 封装。
-# 如果你后续用其他模型（如千问/智谱），可替换这一行及初始化参数。
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 
 from agentService.api_keys import QWEN_API_KEY
-from agentService.prompts.attraction_prompt import (
-    AGENT_SYSTEM_PROMPT,
-)
+from agentService.prompts.prompt import ATTRACTION_AGENT_SYSTEM_PROMPT, ATTRACTION_AGENT_USER_PROMPT
+
+from entity.BasicClass import TripRequest
 
 
 class AttractionSearchAgent:
@@ -22,7 +20,7 @@ class AttractionSearchAgent:
 
     说明：
     - 不负责 MCP 连接管理；
-    - 启动阶段注入已加载的 tools，并预创建 tool agent；
+    - 启动阶段注入已加载的 tools，并预创建agent；
     - 请求阶段仅调用 ainvoke，流程由提示词驱动。
     """
 
@@ -44,34 +42,37 @@ class AttractionSearchAgent:
         # 1) 优先支持外部注入 llm；
         # 2) 若未注入，则默认使用千问 Qwen3-max（OpenAI 兼容接口）。
         self.llm = ChatOpenAI(
-            model="qwen3-max",
+            model="qwen-max",  # 切换为新版千问大模型
             temperature=0.1,
             api_key=SecretStr(QWEN_API_KEY),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
 
         # 启动时预创建一次工具 Agent，后续请求全部复用。
-        self.tool_agent = create_agent(model=self.llm, tools=tools)
+        self.agent = create_agent(model=self.llm, tools=tools)
 
     async def ainvoke(
         self,
-        user_input: str,
+        request: TripRequest,
     ) -> str:
         """
         执行一次景点查询：由模型自行决定工具调用并完成总结。
 
         参数:
-            user_input: 用户自然语言输入。
+            request: 结构化的 TripRequest 请求对象。
 
         返回值:
             str: 最终推荐文案。
         """
+        # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
+        user_prompt = ATTRACTION_AGENT_USER_PROMPT.format(**request.model_dump())
+
         # 由提示词驱动：模型先调工具，再基于工具结果总结。
-        tool_result = await self.tool_agent.ainvoke(
+        tool_result = await self.agent.ainvoke(
             {
                 "messages": [
-                    {"role": "system", "content": AGENT_SYSTEM_PROMPT},
-                    {"role": "user", "content": user_input},
+                    {"role": "system", "content": ATTRACTION_AGENT_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
                 ]
             }
         )

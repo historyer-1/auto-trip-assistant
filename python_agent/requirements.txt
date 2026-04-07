@@ -9,3 +9,4 @@ langchain-core==1.2.19
 langchain-openai==1.0.3
 langchain-community==0.4.1
 langchain-mcp-adapters==0.2.2
+json-repair==0.54.0

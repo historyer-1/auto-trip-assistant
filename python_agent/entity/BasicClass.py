@@ -92,3 +92,16 @@ class TripPlanRequest(BaseModel):
     city: str = Field(...,description="目的地城市")
     start_date: str = Field(...,description="开始日期")
     end_date: str = Field(...,description="结束日期")
+
+class TripRequest(BaseModel):
+    '''
+    网络请求类
+    '''
+    city: str = Field(...,description="目的地城市")
+    start_date: str = Field(...,description="开始日期")
+    end_date: str = Field(...,description="结束日期")
+    preference : str = Field(...,description="旅行偏好")
+    accommodation : str = Field(...,description="住宿偏好")
+    transportation : str = Field(...,description="交通偏好")
+    budget : int = Field(...,description="预算")
+    user_input : str = Field(...,description="用户补充输入")
