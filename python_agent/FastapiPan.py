@@ -8,9 +8,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 
-from agentService.trip_orchestrator_agent import TripOrchestratorAgent
-from agentService.mcp_connector import McpConnector
-from entity.BasicClass import TripPlan, TripRequest
+from agentService.agent.trip_orchestrator_agent import TripOrchestratorAgent
+from agentService.entity.BasicClass import TripPlan, TripRequest
+from agentService.tools.AmapTool import amap_search, amap_weather_search
 
 logger = logging.getLogger(__name__)
 
@@ -21,31 +21,11 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
 	"""管理应用生命周期。
 
-	启动阶段：
-	1. 创建并连接 McpConnector；
-	2. 预加载 MCP 工具；
-	3. 预创建 TripOrchestratorAgent；
-	4. 挂载到 app.state 供路由复用。
-
-	关闭阶段：
-	1. 关闭 MCP 长连接与会话资源。
-
-	参数:
-		app: FastAPI 应用实例。
-
-	返回值:
-		None
 	"""
-	connector = McpConnector()
-	await connector.connect()
+	# 直接注入本地高德工具，避免依赖已移除的 MCP 连接。
+	app.state.agent = TripOrchestratorAgent(tools=[amap_search, amap_weather_search])
+	yield
 
-	app.state.mcp_connector = connector
-	app.state.agent = TripOrchestratorAgent(tools=connector.tools)
-
-	try:
-		yield
-	finally:
-		await connector.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -76,12 +56,6 @@ async def query_agent(payload: TripRequest) -> TripPlan:
 	if agent is None:
 		raise HTTPException(status_code=503, detail="Agent 尚未就绪")
 
-	try:
-		# 为每个请求增加超时保护，避免单请求长时间占用工作线程。
-		answer = await asyncio.wait_for(agent.ainvoke(payload), timeout=600)
-		return answer
-	except TimeoutError as exc:
-		raise HTTPException(status_code=504, detail="请求超时，请稍后重试") from exc
-	except Exception as exc:
-		logger.exception("调用 Agent 失败")
-		raise HTTPException(status_code=500, detail="服务内部错误") from exc
+	
+	answer = await asyncio.wait_for(agent.ainvoke(payload), timeout=600)
+	return answer
