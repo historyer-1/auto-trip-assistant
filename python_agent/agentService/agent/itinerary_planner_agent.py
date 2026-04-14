@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
 
-from agentService.api_keys import QWEN_API_KEY
+from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import PLANNER_AGENT_PROMPT, PLANNER_AGENT_USER_PROMPT
-from agentService.trip_plan_formatter import TripPlanFormatter
-from agentService.trip_workflow_context import TripWorkflowContext
-from entity.BasicClass import TripPlan
+from agentService.entity.trip_plan_formatter import TripPlanFormatter
+from agentService.entity.trip_workflow_context import TripWorkflowContext
+from agentService.entity.BasicClass import TripPlan
 
 
 class ItineraryPlannerAgent:
@@ -28,11 +30,13 @@ class ItineraryPlannerAgent:
             None
         """
         self.llm = ChatOpenAI(
-            model="qwen-max",  # 切换为新版千问大模型
+            model=MODEL,
             temperature=0.1,
             api_key=SecretStr(QWEN_API_KEY),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
+        # 千问兼容模式下，按官方方式使用 response_format 开启 JSON 对象输出。
+        self.agent = self.llm.bind(response_format={"type": "json_object"})
         self.formatter = TripPlanFormatter()
 
     async def ainvoke(self, context: TripWorkflowContext) -> TripPlan:
@@ -46,6 +50,27 @@ class ItineraryPlannerAgent:
         """
         request = context.request
 
+        attraction_result = json.dumps(
+            context.attraction_response.model_dump(mode="json"),
+            ensure_ascii=False,
+            indent=2,
+        )
+        weather_result = json.dumps(
+            context.weather_response.model_dump(mode="json"),
+            ensure_ascii=False,
+            indent=2,
+        )
+        hotel_result = json.dumps(
+            context.hotel_response.model_dump(mode="json"),
+            ensure_ascii=False,
+            indent=2,
+        )
+        meals_result = json.dumps(
+            context.meals_response.model_dump(mode="json"),
+            ensure_ascii=False,
+            indent=2,
+        )
+
         # 组装最小输入，让规划 Agent 聚合三个搜索结果并输出 JSON。
         user_prompt = PLANNER_AGENT_USER_PROMPT.format(
             city=request.city,
@@ -55,21 +80,19 @@ class ItineraryPlannerAgent:
             accommodation=request.accommodation,
             preferences=request.preference,
             budget_note=f"总预算约 {request.budget} 元",
-            attraction_result=context.attraction_result,
-            weather_result=context.weather_result,
-            hotel_result=context.hotel_result,
+            attraction_result=attraction_result,
+            weather_result=weather_result,
+            hotel_result=hotel_result,
+            meals_result=meals_result,
         )
+        user_prompt += "\n\n请仅返回 JSON 对象。"
 
-        response = await self.llm.ainvoke(
+        response = await self.agent.ainvoke(
             [
                 {"role": "system", "content": PLANNER_AGENT_PROMPT},
                 {"role": "user", "content": user_prompt},
             ]
         )
-
-        # 先按 TripPlan 严格解析，失败后交给独立格式化类做字段兜底。
         raw_content = response.content if isinstance(response.content, str) else str(response.content)
-        try:
-            return TripPlan.model_validate_json(raw_content)
-        except Exception:
-            return self.formatter.format(raw_content)
+        return self.formatter.format(raw_content)
+

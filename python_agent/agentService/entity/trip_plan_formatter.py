@@ -6,7 +6,7 @@ import json
 
 from json_repair import repair_json
 
-from entity.BasicClass import Attraction, Budget, DayPlan, Hotel, Meal, TripPlan, WeatherInfo
+from agentService.entity.BasicClass import Attraction, Budget, DayPlan, Hotel, Meal, TripPlan, WeatherInfo
 
 
 class TripPlanFormatter:
@@ -27,6 +27,10 @@ class TripPlanFormatter:
         # 按 TripPlan 结构做最小字段规整，避免模型把字段名写偏。
         days_payload = payload.get("days", [])
         weather_payload = payload.get("weather_info", [])
+        if not isinstance(days_payload, list):
+            days_payload = []
+        if not isinstance(weather_payload, list):
+            weather_payload = []
         days = [self._build_day_plan(day, index) for index, day in enumerate(days_payload) if isinstance(day, dict)]
         weather_info = [self._build_weather_info(item) for item in weather_payload if isinstance(item, dict)]
 
@@ -108,8 +112,33 @@ class TripPlanFormatter:
         返回值:
             DayPlan: 规整后的单日行程。
         """
-        attractions = [self._build_attraction(item) for item in day.get("attractions", []) if isinstance(item, dict)]
-        meals = [self._build_meal(item) for item in day.get("meals", []) if isinstance(item, dict)]
+        attractions_payload = day.get("attractions", [])
+        meals_payload = day.get("meals", [])
+        if not isinstance(attractions_payload, list):
+            attractions_payload = []
+        if not isinstance(meals_payload, list):
+            meals_payload = []
+
+        attractions = [self._build_attraction(item) for item in attractions_payload if isinstance(item, dict)]
+        meals = [self._build_meal(item) for item in meals_payload if isinstance(item, dict)]
+
+        attraction1_payload = day.get("attractions1")
+        attraction2_payload = day.get("attractions2")
+        lunch_payload = day.get("lunch")
+        dinner_payload = day.get("dinner")
+
+        if isinstance(attraction1_payload, dict):
+            attractions.insert(0, self._build_attraction(attraction1_payload))
+        if isinstance(attraction2_payload, dict):
+            attractions.append(self._build_attraction(attraction2_payload))
+
+        if isinstance(lunch_payload, dict):
+            meals.insert(0, self._build_meal(lunch_payload))
+        if isinstance(dinner_payload, dict):
+            meals.append(self._build_meal(dinner_payload))
+
+        attractions = self._dedupe_attractions(attractions)
+        meals = self._dedupe_meals(meals)
         hotel_payload = day.get("hotel")
         hotel = self._build_hotel(hotel_payload) if isinstance(hotel_payload, dict) else None
 
@@ -125,6 +154,30 @@ class TripPlanFormatter:
                 "meals": meals,
             }
         )
+
+    def _dedupe_attractions(self, attractions: list[Attraction]) -> list[Attraction]:
+        """按名称+地址去重景点，避免新旧字段同时存在时重复。"""
+        seen: set[tuple[str, str]] = set()
+        result: list[Attraction] = []
+        for attraction in attractions:
+            key = (attraction.name.strip(), attraction.address.strip())
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(attraction)
+        return result
+
+    def _dedupe_meals(self, meals: list[Meal]) -> list[Meal]:
+        """按类型+名称+地址去重餐饮，避免新旧字段同时存在时重复。"""
+        seen: set[tuple[str, str, str]] = set()
+        result: list[Meal] = []
+        for meal in meals:
+            key = (meal.type.strip().lower(), meal.name.strip(), (meal.address or "").strip())
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(meal)
+        return result
 
     def _build_attraction(self, attraction: dict) -> Attraction:
         """规整单条景点信息。

@@ -8,9 +8,9 @@ from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 
-from agentService.api_keys import QWEN_API_KEY
-from agentService.prompts.prompt import HOTEL_AGENT_PROMPT, HOTEL_AGENT_USER_PROMPT
-from entity.BasicClass import TripRequest
+from agentService.entity.api_keys import MODEL, QWEN_API_KEY
+from agentService.prompts.prompt import HOTEL_AGENT_SYSTEM_PROMPT, HOTEL_AGENT_USER_PROMPT
+from agentService.entity.BasicClass import HotelSearchResponse, TripRequest
 
 
 class HotelSearchAgent:
@@ -32,23 +32,28 @@ class HotelSearchAgent:
             None
         """
         self.llm = ChatOpenAI(
-            model="qwen-max",  # 切换为新版千问大模型
+            model=MODEL,
             temperature=0.1,
             api_key=SecretStr(QWEN_API_KEY),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+            extra_body={"enable_thinking": False},
         )
-        self.agent = create_agent(model=self.llm, tools=tools)
+        self.agent = create_agent(
+            model=self.llm,
+            tools=tools,
+            response_format=HotelSearchResponse,
+        )
 
-    async def ainvoke(self, request: TripRequest) -> str:
+    async def ainvoke(self, request: TripRequest) -> HotelSearchResponse:
         """执行一次酒店搜索并返回中文摘要。
 
         参数:
             request: 结构化 TripRequest 请求对象。
 
         返回值:
-            str: 酒店搜索结果。
+            HotelSearchResponse: 酒店结构化结果和补充信息。
         """
-        # 将请求对象格式化为用户提示词，交给模型自动选择工具。
+        # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
         user_prompt = HOTEL_AGENT_USER_PROMPT.format(
             city=request.city,
             accommodation=request.accommodation,
@@ -60,18 +65,24 @@ class HotelSearchAgent:
         tool_result = await self.agent.ainvoke(
             {
                 "messages": [
-                    {"role": "system", "content": HOTEL_AGENT_PROMPT},
+                    {"role": "system", "content": HOTEL_AGENT_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ]
             }
         )
 
-        # 保留最小必要解析：取最后一条消息内容。
-        messages = tool_result.get("messages", []) if isinstance(tool_result, dict) else []
-        if not messages:
-            return "未获取到可用酒店结果，请稍后重试。"
+        # 调试输出：查看模型和工具链的原始返回，便于判断空结果来源。
+        # print("[HOTEL] tool_result:", tool_result)
 
-        content = getattr(messages[-1], "content", "")
-        if isinstance(content, str):
-            return content
-        return str(content)
+        if not isinstance(tool_result, dict):
+            return HotelSearchResponse(hotels=[], message="")
+
+        structured = tool_result.get("structured_response")
+        # print("[HOTEL] structured_response:", structured)
+        if structured is None:
+            return HotelSearchResponse(hotels=[], message="")
+
+        if isinstance(structured, HotelSearchResponse):
+            return structured
+
+        return HotelSearchResponse.model_validate(structured)
