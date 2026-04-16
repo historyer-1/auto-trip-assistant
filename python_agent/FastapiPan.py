@@ -57,5 +57,5 @@ async def query_agent(payload: TripRequest) -> TripPlan:
 		raise HTTPException(status_code=503, detail="Agent 尚未就绪")
 
 	
-	answer = await asyncio.wait_for(agent.ainvoke(payload), timeout=600)
+	answer = await asyncio.wait_for(agent.ainvoke(payload), timeout=60)
 	return answer

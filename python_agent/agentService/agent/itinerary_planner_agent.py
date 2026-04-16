@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+from typing import Any, cast
 
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
+from langchain.agents import create_agent
+from langchain.agents.middleware import ModelCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import PLANNER_AGENT_PROMPT, PLANNER_AGENT_USER_PROMPT
@@ -29,15 +32,21 @@ class ItineraryPlannerAgent:
         返回值:
             None
         """
+        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=2, run_limit=2)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
             api_key=SecretStr(QWEN_API_KEY),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        )
-        # 千问兼容模式下，按官方方式使用 response_format 开启 JSON 对象输出。
-        self.agent = self.llm.bind(response_format={"type": "json_object"})
+            extra_body={"enable_thinking": False,},
+        ).bind(response_format={"type": "json_object"})
         self.formatter = TripPlanFormatter()
+        self.agent = create_agent(
+            model=cast(Any, self.llm),
+            tools=[],
+            response_format=TripPlan,
+            middleware=cast(Any, [self.llm_limiter]),
+        )
 
     async def ainvoke(self, context: TripWorkflowContext) -> TripPlan:
         """根据共享上下文生成结构化 TripPlan。
@@ -88,11 +97,24 @@ class ItineraryPlannerAgent:
         user_prompt += "\n\n请仅返回 JSON 对象。"
 
         response = await self.agent.ainvoke(
-            [
-                {"role": "system", "content": PLANNER_AGENT_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ]
+            {
+                "messages": [
+                    {"role": "system", "content": PLANNER_AGENT_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ]
+            }
         )
-        raw_content = response.content if isinstance(response.content, str) else str(response.content)
+
+        if not isinstance(response, dict):
+            return self.formatter.format("")
+
+        structured = response.get("structured_response")
+        if structured is None:
+            return self.formatter.format("")
+
+        if isinstance(structured, TripPlan):
+            return structured
+
+        raw_content = structured if isinstance(structured, str) else json.dumps(structured, ensure_ascii=False)
         return self.formatter.format(raw_content)
 
