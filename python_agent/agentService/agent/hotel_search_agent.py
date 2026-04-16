@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
+from langchain.agents.middleware import ModelCallLimitMiddleware
+from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import HOTEL_AGENT_SYSTEM_PROMPT, HOTEL_AGENT_USER_PROMPT
@@ -31,6 +33,8 @@ class HotelSearchAgent:
         返回值:
             None
         """
+        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=2, run_limit=2)
+        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=5, run_limit=5)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
@@ -42,6 +46,7 @@ class HotelSearchAgent:
             model=self.llm,
             tools=tools,
             response_format=HotelSearchResponse,
+            middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
     async def ainvoke(self, request: TripRequest) -> HotelSearchResponse:

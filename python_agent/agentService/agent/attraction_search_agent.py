@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from pydantic import SecretStr
 
@@ -10,10 +10,12 @@ from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
+from agentService.entity.debug_callbacks import DebugTraceCallbackHandler
 from agentService.prompts.prompt import ATTRACTION_AGENT_SYSTEM_PROMPT, ATTRACTION_AGENT_USER_PROMPT
 
 from agentService.entity.BasicClass import Attraction, AttractionSearchResponse, TripRequest
-
+from langchain.agents.middleware import ToolCallLimitMiddleware
+from langchain.agents.middleware import ModelCallLimitMiddleware
 
 class AttractionSearchAgent:
     """景点搜索 Agent（极简复用型）。
@@ -41,12 +43,17 @@ class AttractionSearchAgent:
         # 兼容说明：
         # 1) 优先支持外部注入 llm；
         # 2) 若未注入，则默认使用千问 Qwen3-max（OpenAI 兼容接口）。
+
+        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=2, run_limit=2)
+        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=5, run_limit=5)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
             api_key=SecretStr(QWEN_API_KEY),
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-            extra_body={"enable_thinking": False},
+            extra_body={
+                "enable_thinking": False,
+            },
         )
 
         # 启动时预创建一次工具 Agent，后续请求全部复用。
@@ -54,6 +61,7 @@ class AttractionSearchAgent:
             model=self.llm,
             tools=tools,
             response_format=AttractionSearchResponse,
+            middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
     async def ainvoke(
@@ -73,13 +81,15 @@ class AttractionSearchAgent:
         user_prompt = ATTRACTION_AGENT_USER_PROMPT.format(**request.model_dump())
 
         # 由提示词驱动：模型先调工具，再基于工具结果总结。
+        debug_callback = DebugTraceCallbackHandler(label="ATTRACTION")
         tool_result = await self.agent.ainvoke(
             {
                 "messages": [
                     {"role": "system", "content": ATTRACTION_AGENT_SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt},
                 ]
-            }
+            },
+            #config={"callbacks": [debug_callback]},
         )
 
         # 调试输出：查看模型和工具链的原始返回，便于判断空结果来源。

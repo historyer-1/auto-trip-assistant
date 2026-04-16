@@ -4,6 +4,7 @@ from agentService.agent.attraction_search_agent import AttractionSearchAgent
 from agentService.agent.hotel_search_agent import HotelSearchAgent
 from agentService.agent.itinerary_planner_agent import ItineraryPlannerAgent
 from agentService.agent.meal_search_agent import MealSearchAgent
+from agentService.agent.trip_orchestrator_agent import TripOrchestratorAgent
 from agentService.agent.weather_search_agent import WeatherSearchAgent
 from agentService.entity.trip_workflow_context import TripWorkflowContext
 from agentService.tools.AmapTool import amap_search, amap_weather_search
@@ -22,6 +23,7 @@ from agentService.entity.BasicClass import (
 
 PLACE_TOOLS = [amap_search]
 WEATHER_TOOLS = [amap_weather_search]
+ALL_TOOLS = [amap_search, amap_weather_search]
 
 
 def _build_sample_request() -> TripRequest:
@@ -31,14 +33,37 @@ def _build_sample_request() -> TripRequest:
         TripRequest: 用于单独测试各智能体的示例请求。
     """
     return TripRequest(
-        city="北京",
-        start_date="2026-04-15",
-        end_date="2026-04-16",
-        preference="历史文化",
-        accommodation="市中心",
-        transportation="地铁",
-        budget=2000,
-        user_input="我想安排一个三天两晚的北京行程，优先历史文化景点。",
+        # city="北京",
+        # start_date="2026-04-15",
+        # end_date="2026-04-16",
+        # preference="历史文化",
+        # accommodation="市中心",
+        # transportation="地铁",
+        # budget=2000,
+        # user_input="我想安排一个三天两晚的北京行程，优先历史文化景点。",
+        city="上海",
+        start_date="2026-04-16",
+        end_date= "2026-04-17",
+        preference="历史文化、美食",
+        accommodation="经济型酒店，交通便利",
+        transportation="地铁+步行",
+        budget=3000,
+        user_input="希望有适合亲子游的景点，最好有博物馆或科技馆",
+
+    )
+
+
+def _build_shanghai_request() -> TripRequest:
+    """构造更贴近真实接口调用的上海旅行请求。"""
+    return TripRequest(
+        city="上海市",
+        start_date="2026-04-16",
+        end_date="2026-04-17",
+        preference="城市观光、历史文化、美食",
+        accommodation="市中心酒店，地铁方便",
+        transportation="地铁+步行",
+        budget=3000,
+        user_input="希望行程轻松一些，安排外滩、豫园、南京路步行街、上海博物馆，并推荐当地特色美食。",
     )
 
 
@@ -56,84 +81,94 @@ def _build_sample_context(request: TripRequest) -> TripWorkflowContext:
         attraction_result=AttractionSearchResponse(
             attractions=[
                 Attraction(
-                    name="故宫博物院",
-                    address="北京市东城区景山前街4号",
-                    location=Location(longitude=116.3975, latitude=39.9163),
-                    visit_duration=240,
-                    description="中国明清两代皇家宫殿，历史文化价值极高。",
-                    category="历史文化",
+                    name="外滩",
+                    address="上海市黄浦区中山东一路",
+                    location=Location(longitude=121.4903, latitude=31.2410),
+                    visit_duration=120,
+                    description="黄浦江畔经典城市地标，适合傍晚观景和拍照。",
+                    category="城市观光",
                     rating=4.9,
-                    ticket_price=60,
+                    ticket_price=0,
                 ),
                 Attraction(
-                    name="国家博物馆",
-                    address="北京市东城区东长安街16号",
-                    location=Location(longitude=116.4074, latitude=39.9057),
+                    name="豫园",
+                    address="上海市黄浦区豫园老街",
+                    location=Location(longitude=121.4926, latitude=31.2271),
                     visit_duration=180,
-                    description="馆藏丰富，适合深度了解中国历史文化。",
+                    description="江南园林代表，适合感受老上海历史文化氛围。",
                     category="博物馆",
+                    rating=4.8,
+                    ticket_price=30,
+                ),
+                Attraction(
+                    name="上海博物馆",
+                    address="上海市黄浦区人民大道201号",
+                    location=Location(longitude=121.4737, latitude=31.2304),
+                    visit_duration=180,
+                    description="馆藏体系完整，适合了解中国古代艺术与历史。",
+                    category="历史文化",
                     rating=4.8,
                     ticket_price=0,
                 ),
             ],
-            message="已优先筛选历史文化类景点。",
+            message="已优先筛选上海城市观光与历史文化类景点。",
         ),
         weather_result=WeatherSearchResponse(
             weather_info=[
                 WeatherInfo(
-                    date="2026-04-15",
+                    date="2026-04-16",
                     day_weather="晴",
                     night_weather="多云",
-                    day_temp=21,
-                    night_temp=11,
-                    wind_direction="东北风",
+                    day_temp=22,
+                    night_temp=16,
+                    wind_direction="东南风",
                     wind_power="3级",
                 ),
                 WeatherInfo(
-                    date="2026-04-16",
+                    date="2026-04-17",
                     day_weather="多云",
                     night_weather="晴",
-                    day_temp=23,
-                    night_temp=12,
-                    wind_direction="北风",
+                    day_temp=24,
+                    night_temp=17,
+                    wind_direction="东风",
                     wind_power="2级",
                 ),
             ],
-            message="天气总体稳定，建议携带薄外套。",
+            message="上海两天以晴到多云为主，适合城市步行游览，建议带轻薄外套。",
         ),
         hotel_result=HotelSearchResponse(
             hotels=[
                 Hotel(
-                    name="北京饭店",
-                    address="北京市东城区东长安街33号",
-                    location=Location(longitude=116.4102, latitude=39.9085),
-                    price_range="800-1200元/晚",
+                    name="上海外滩华尔道夫酒店",
+                    address="上海市黄浦区中山东一路2号",
+                    location=Location(longitude=121.4913, latitude=31.2408),
+                    price_range="1800-2600元/晚",
                     rating="4.7",
-                    distance="距故宫约2.5公里",
+                    distance="距外滩步行可达",
                     type="高档酒店",
-                    estimated_cost=1000,
+                    estimated_cost=2200,
                 ),
                 Hotel(
-                    name="王府井精品酒店",
-                    address="北京市东城区王府井大街88号",
-                    location=Location(longitude=116.4128, latitude=39.9134),
-                    price_range="500-800元/晚",
-                    rating="4.5",
-                    distance="距国家博物馆约3.0公里",
+                    name="上海南京路智选假日酒店",
+                    address="上海市黄浦区福建中路",
+                    location=Location(longitude=121.4819, latitude=31.2368),
+                    price_range="700-1100元/晚",
+                    rating="4.6",
+                    distance="距南京路步行街较近",
                     type="精品酒店",
-                    estimated_cost=650,
+                    estimated_cost=900,
                 ),
             ],
-            message="已按预算和住宿偏好筛选酒店。",
+            message="已按预算和市中心、地铁便利的偏好筛选上海酒店。",
         ),
         meals_result=MealSearchResponse(
             meals=[
-                Meal(type="breakfast", name="护国寺小吃", estimated_cost=35),
-                Meal(type="lunch", name="四季民福烤鸭", estimated_cost=180),
-                Meal(type="dinner", name="老北京涮肉", estimated_cost=150),
-                Meal(type="snack", name="豆汁儿焦圈", estimated_cost=25),
+                Meal(type="breakfast", name="沈大成", estimated_cost=30),
+                Meal(type="lunch", name="南翔馒头店", estimated_cost=80),
+                Meal(type="dinner", name="老饭店本帮菜", estimated_cost=180),
+                Meal(type="snack", name="大壶春生煎", estimated_cost=25),
             ],
-            message="已优先覆盖早餐、午餐、晚餐与小吃场景。",
+            message="已优先覆盖上海本地早餐、午餐、晚餐与小吃场景。",
         ),
     )
     return context
@@ -150,7 +185,7 @@ async def test_attraction_search() -> None:
     request = _build_sample_request()
     agent = AttractionSearchAgent(tools=PLACE_TOOLS)
     result = await agent.ainvoke(request)
-    print("[ATTRACTION_RESULT]", result.model_dump())
+    print("[ATTRACTION_RESULT]", result)
 
 
 async def test_hotel_search() -> None:
@@ -162,7 +197,7 @@ async def test_hotel_search() -> None:
     request = _build_sample_request()
     agent = HotelSearchAgent(tools=PLACE_TOOLS)
     result = await agent.ainvoke(request)
-    # print("[HOTEL_RESULT]", result.model_dump())
+    # print("[HOTEL_RESULT]", result)
 
 
 async def test_meal_search() -> None:
@@ -174,7 +209,7 @@ async def test_meal_search() -> None:
     request = _build_sample_request()
     agent = MealSearchAgent(tools=PLACE_TOOLS)
     result = await agent.ainvoke(request)
-    # print("[MEAL_RESULT]", result.model_dump())
+    # print("[MEAL_RESULT]", result)
 
 
 async def test_weather_search() -> None:
@@ -186,7 +221,7 @@ async def test_weather_search() -> None:
     request = _build_sample_request()
     agent = WeatherSearchAgent(tools=WEATHER_TOOLS)
     result = await agent.ainvoke(request)
-    # print("[WEATHER_RESULT]", result.model_dump())
+    # print("[WEATHER_RESULT]", result)
 
 
 async def test_itinerary_planner() -> None:
@@ -196,6 +231,14 @@ async def test_itinerary_planner() -> None:
     agent = ItineraryPlannerAgent()
     result = await agent.ainvoke(context)
     print("[PLAN_RESULT]", result.model_dump())
+
+
+async def test_trip_orchestrator() -> None:
+    """用真实请求、真实工具和总编排 Agent 跑完整链路。"""
+    request = _build_shanghai_request()
+    agent = TripOrchestratorAgent(tools=ALL_TOOLS)
+    result = await asyncio.wait_for(agent.ainvoke(request), timeout=600)
+    print("[ORCHESTRATOR_RESULT]", result.model_dump())
 
 
 def test_amap_search() -> None:
@@ -235,7 +278,7 @@ async def main() -> None:
     返回值:
         None
     """
-    await test_itinerary_planner()
+    await test_trip_orchestrator()
 
 
 if __name__ == "__main__":

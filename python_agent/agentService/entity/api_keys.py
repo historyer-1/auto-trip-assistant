@@ -19,4 +19,4 @@ AMAP_WEB_API_KEY = "0c96342556d15ebda3bb72a144ce81c8"
 QWEN_API_KEY = "sk-285342b1a39d495abdeacac644a5c320"
 
 # 统一模型配置，后续只需要修改这一处。
-MODEL = "qwen3.6-plus-2026-04-02"
+MODEL = "qwen3-max-preview"

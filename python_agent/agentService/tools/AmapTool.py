@@ -94,8 +94,8 @@ def amap_search(keywords: str, region: str, page_size: int = 5) -> str:
 	"""按关键字和城市区划查询高德地点信息。
 
 	参数:
-		keywords: 查询关键字，例如“北京大学”。
-		region: 搜索城市区划，例如“北京市”。
+		keywords: 查询关键字，例如“北京大学”，只接受一个关键词。
+		region: 搜索城市区划，例如“北京市”，只接受一个城市。
 		page_size: 返回条数，默认 5，范围 1 到 6。
 
 	返回值:
@@ -166,7 +166,7 @@ def amap_weather_search(city: str) -> str:
 	"""按城市查询高德天气预报。
 
 	参数:
-		city: 城市名称。
+		city: 城市名称，只接受一个城市。
 
 	返回值:
 		str: 统一格式字符串；成功返回天气预报，失败返回错误信息。
