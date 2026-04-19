@@ -13,7 +13,7 @@ from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.entity.debug_callbacks import DebugTraceCallbackHandler
 from agentService.prompts.prompt import ATTRACTION_AGENT_SYSTEM_PROMPT, ATTRACTION_AGENT_USER_PROMPT
 
-from agentService.entity.BasicClass import Attraction, AttractionSearchResponse, TripRequest
+from agentService.entity.BasicClass import TripRequest
 from langchain.agents.middleware import ToolCallLimitMiddleware
 from langchain.agents.middleware import ModelCallLimitMiddleware
 
@@ -44,8 +44,8 @@ class AttractionSearchAgent:
         # 1) 优先支持外部注入 llm；
         # 2) 若未注入，则默认使用千问 Qwen3-max（OpenAI 兼容接口）。
 
-        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=2, run_limit=2)
-        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=5, run_limit=5)
+        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=4, run_limit=4)
+        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=6, run_limit=6)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
@@ -60,14 +60,13 @@ class AttractionSearchAgent:
         self.agent = create_agent(
             model=self.llm,
             tools=tools,
-            response_format=AttractionSearchResponse,
             middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
     async def ainvoke(
         self,
         request: TripRequest,
-    ) -> AttractionSearchResponse:
+    ) -> str:
         """
         执行一次景点查询：由模型自行决定工具调用并完成总结。
 
@@ -75,7 +74,7 @@ class AttractionSearchAgent:
             request: 结构化的 TripRequest 请求对象。
 
         返回值:
-            AttractionSearchResponse: 景点搜索完整响应。
+            str: 模型与工具链路原始输出字符串。
         """
         # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
         user_prompt = ATTRACTION_AGENT_USER_PROMPT.format(**request.model_dump())
@@ -91,21 +90,6 @@ class AttractionSearchAgent:
             },
             #config={"callbacks": [debug_callback]},
         )
-
-        # 调试输出：查看模型和工具链的原始返回，便于判断空结果来源。
-        # print("[ATTRACTION] tool_result:", tool_result)
-
-        if not isinstance(tool_result, dict):
-            return AttractionSearchResponse(attractions=[], message="")
-
-        structured = tool_result.get("structured_response")
-        # print("[ATTRACTION] structured_response:", structured)
-        if structured is None:
-            return AttractionSearchResponse(attractions=[], message="")
-
-        if isinstance(structured, AttractionSearchResponse):
-            return structured
-
-        return AttractionSearchResponse.model_validate(structured)
+        return str(tool_result)
 
 

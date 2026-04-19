@@ -107,25 +107,3 @@ class TripRequest(BaseModel):
     budget : int = Field(...,description="预算")
     user_input : str = Field(...,description="用户补充输入")
 
-class AttractionSearchResponse(BaseModel):
-    """景点搜索响应模型，封装景点列表和补充信息。"""
-    attractions: List[Attraction] = Field(default_factory=list, description="景点列表")
-    message: str = Field(default="", description="补充信息")
-
-
-class HotelSearchResponse(BaseModel):
-    """酒店搜索响应模型，封装酒店列表和补充信息。"""
-    hotels: List[Hotel] = Field(default_factory=list, description="酒店列表")
-    message: str = Field(default="", description="补充信息")
-
-
-class MealSearchResponse(BaseModel):
-    """餐饮搜索响应模型，封装餐饮列表和补充信息。"""
-    meals: List[Meal] = Field(default_factory=list, description="餐饮列表")
-    message: str = Field(default="", description="补充信息")
-
-
-class WeatherSearchResponse(BaseModel):
-    """天气搜索响应模型，封装天气列表和补充信息。"""
-    weather_info: List[WeatherInfo] = Field(default_factory=list, description="天气列表")
-    message: str = Field(default="", description="补充信息")

@@ -12,7 +12,7 @@ from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import MEAL_AGENT_SYSTEM_PROMPT, MEAL_AGENT_USER_PROMPT
-from agentService.entity.BasicClass import MealSearchResponse, TripRequest
+from agentService.entity.BasicClass import TripRequest
 
 
 class MealSearchAgent:
@@ -33,8 +33,8 @@ class MealSearchAgent:
         返回值:
             None
         """
-        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=2, run_limit=2)
-        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=5, run_limit=5)
+        self.tool_limiter = ToolCallLimitMiddleware(thread_limit=4, run_limit=4)
+        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=6, run_limit=6)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
@@ -45,18 +45,17 @@ class MealSearchAgent:
         self.agent = create_agent(
             model=self.llm,
             tools=tools,
-            response_format=MealSearchResponse,
             middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
-    async def ainvoke(self, request: TripRequest) -> MealSearchResponse:
+    async def ainvoke(self, request: TripRequest) -> str:
         """执行一次餐饮搜索并返回结构化结果。
 
         参数:
             request: 结构化 TripRequest 请求对象。
 
         返回值:
-            MealSearchResponse: 餐饮结构化结果和补充信息。
+            str: 模型与工具链路原始输出字符串。
         """
         # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
         user_prompt = MEAL_AGENT_USER_PROMPT.format(
@@ -76,19 +75,4 @@ class MealSearchAgent:
                 ]
             }
         )
-
-        # 调试输出：查看模型和工具链的原始返回，便于判断空结果来源。
-        # print("[MEAL] tool_result:", tool_result)
-
-        if not isinstance(tool_result, dict):
-            return MealSearchResponse(meals=[], message="")
-
-        structured = tool_result.get("structured_response")
-        # print("[MEAL] structured_response:", structured)
-        if structured is None:
-            return MealSearchResponse(meals=[], message="")
-
-        if isinstance(structured, MealSearchResponse):
-            return structured
-
-        return MealSearchResponse.model_validate(structured)
+        return str(tool_result)

@@ -12,7 +12,7 @@ from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import HOTEL_AGENT_SYSTEM_PROMPT, HOTEL_AGENT_USER_PROMPT
-from agentService.entity.BasicClass import HotelSearchResponse, TripRequest
+from agentService.entity.BasicClass import TripRequest
 
 
 class HotelSearchAgent:
@@ -45,18 +45,17 @@ class HotelSearchAgent:
         self.agent = create_agent(
             model=self.llm,
             tools=tools,
-            response_format=HotelSearchResponse,
             middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
-    async def ainvoke(self, request: TripRequest) -> HotelSearchResponse:
+    async def ainvoke(self, request: TripRequest) -> str:
         """执行一次酒店搜索并返回中文摘要。
 
         参数:
             request: 结构化 TripRequest 请求对象。
 
         返回值:
-            HotelSearchResponse: 酒店结构化结果和补充信息。
+            str: 模型与工具链路原始输出字符串。
         """
         # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
         user_prompt = HOTEL_AGENT_USER_PROMPT.format(
@@ -75,19 +74,4 @@ class HotelSearchAgent:
                 ]
             }
         )
-
-        # 调试输出：查看模型和工具链的原始返回，便于判断空结果来源。
-        # print("[HOTEL] tool_result:", tool_result)
-
-        if not isinstance(tool_result, dict):
-            return HotelSearchResponse(hotels=[], message="")
-
-        structured = tool_result.get("structured_response")
-        # print("[HOTEL] structured_response:", structured)
-        if structured is None:
-            return HotelSearchResponse(hotels=[], message="")
-
-        if isinstance(structured, HotelSearchResponse):
-            return structured
-
-        return HotelSearchResponse.model_validate(structured)
+        return str(tool_result)
