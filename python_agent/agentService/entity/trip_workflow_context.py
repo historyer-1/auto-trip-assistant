@@ -4,44 +4,38 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from agentService.entity.BasicClass import (
-    AttractionSearchResponse,
-    HotelSearchResponse,
-    MealSearchResponse,
-    TripRequest,
-    WeatherSearchResponse,
-)
+from agentService.entity.BasicClass import TripRequest
 
 
 class TripWorkflowContext(BaseModel):
     """共享上下文数据。
 
     说明：
-    - 景点结果保存为完整的搜索响应对象，以匹配当前景点智能体输出；
-    - 天气、酒店、餐饮结果也保存为完整的搜索响应对象，便于统一携带 message。
+    - 四个搜索智能体输出统一保存为字符串；
+    - 字符串中包含工具输出和模型输出，供规划智能体直接消费。
     """
 
     request: TripRequest = Field(..., description="用户原始旅行请求")
-    attraction_response: AttractionSearchResponse = Field(default_factory=AttractionSearchResponse, description="景点搜索响应")
-    weather_response: WeatherSearchResponse = Field(default_factory=WeatherSearchResponse, description="天气搜索响应")
-    hotel_response: HotelSearchResponse = Field(default_factory=HotelSearchResponse, description="酒店搜索响应")
-    meals_response: MealSearchResponse = Field(default_factory=MealSearchResponse, description="餐饮搜索响应")
+    attraction_response: str = Field(default="", description="景点搜索原始输出")
+    weather_response: str = Field(default="", description="天气搜索原始输出")
+    hotel_response: str = Field(default="", description="酒店搜索原始输出")
+    meals_response: str = Field(default="", description="餐饮搜索原始输出")
 
 
     def save_search_results(
         self,
-        attraction_result: AttractionSearchResponse,
-        weather_result: WeatherSearchResponse,
-        hotel_result: HotelSearchResponse,
-        meals_result: MealSearchResponse,
+        attraction_result: str,
+        weather_result: str,
+        hotel_result: str,
+        meals_result: str,
     ) -> None:
         """写入四个搜索智能体的结果。
 
         参数:
-            attraction_result: 景点搜索结构化结果。
-            weather_result: 天气搜索结构化结果。
-            hotel_result: 酒店搜索结构化结果。
-            meals_result: 餐饮搜索结构化结果。
+            attraction_result: 景点搜索原始输出。
+            weather_result: 天气搜索原始输出。
+            hotel_result: 酒店搜索原始输出。
+            meals_result: 餐饮搜索原始输出。
 
         返回值:
             None

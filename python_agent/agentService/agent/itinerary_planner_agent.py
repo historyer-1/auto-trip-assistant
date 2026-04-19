@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
-from typing import Any, cast
+from typing import Any
 
 from pydantic import SecretStr
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
-from langchain.agents.middleware import ModelCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import PLANNER_AGENT_PROMPT, PLANNER_AGENT_USER_PROMPT
@@ -32,7 +29,6 @@ class ItineraryPlannerAgent:
         返回值:
             None
         """
-        self.llm_limiter = ModelCallLimitMiddleware(thread_limit=2, run_limit=2)
         self.llm = ChatOpenAI(
             model=MODEL,
             temperature=0.1,
@@ -41,12 +37,6 @@ class ItineraryPlannerAgent:
             extra_body={"enable_thinking": False,},
         ).bind(response_format={"type": "json_object"})
         self.formatter = TripPlanFormatter()
-        self.agent = create_agent(
-            model=cast(Any, self.llm),
-            tools=[],
-            response_format=TripPlan,
-            middleware=cast(Any, [self.llm_limiter]),
-        )
 
     async def ainvoke(self, context: TripWorkflowContext) -> TripPlan:
         """根据共享上下文生成结构化 TripPlan。
@@ -59,26 +49,10 @@ class ItineraryPlannerAgent:
         """
         request = context.request
 
-        attraction_result = json.dumps(
-            context.attraction_response.model_dump(mode="json"),
-            ensure_ascii=False,
-            indent=2,
-        )
-        weather_result = json.dumps(
-            context.weather_response.model_dump(mode="json"),
-            ensure_ascii=False,
-            indent=2,
-        )
-        hotel_result = json.dumps(
-            context.hotel_response.model_dump(mode="json"),
-            ensure_ascii=False,
-            indent=2,
-        )
-        meals_result = json.dumps(
-            context.meals_response.model_dump(mode="json"),
-            ensure_ascii=False,
-            indent=2,
-        )
+        attraction_result = context.attraction_response
+        weather_result = context.weather_response
+        hotel_result = context.hotel_response
+        meals_result = context.meals_response
 
         # 组装最小输入，让规划 Agent 聚合三个搜索结果并输出 JSON。
         user_prompt = PLANNER_AGENT_USER_PROMPT.format(
@@ -96,25 +70,13 @@ class ItineraryPlannerAgent:
         )
         user_prompt += "\n\n请仅返回 JSON 对象。"
 
-        response = await self.agent.ainvoke(
-            {
-                "messages": [
-                    {"role": "system", "content": PLANNER_AGENT_PROMPT},
-                    {"role": "user", "content": user_prompt},
-                ]
-            }
+        response = await self.llm.ainvoke(
+            [
+                {"role": "system", "content": PLANNER_AGENT_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ]
         )
 
-        if not isinstance(response, dict):
-            return self.formatter.format("")
-
-        structured = response.get("structured_response")
-        if structured is None:
-            return self.formatter.format("")
-
-        if isinstance(structured, TripPlan):
-            return structured
-
-        raw_content = structured if isinstance(structured, str) else json.dumps(structured, ensure_ascii=False)
-        return self.formatter.format(raw_content)
+        raw_content = getattr(response, "content", response)
+        return self.formatter.format(raw_content if isinstance(raw_content, str) else str(raw_content))
 

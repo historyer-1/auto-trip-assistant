@@ -12,7 +12,7 @@ from langchain.agents.middleware import ToolCallLimitMiddleware
 
 from agentService.entity.api_keys import MODEL, QWEN_API_KEY
 from agentService.prompts.prompt import WEATHER_AGENT_SYSTEM_PROMPT, WEATHER_AGENT_USER_PROMPT
-from agentService.entity.BasicClass import TripRequest, WeatherSearchResponse
+from agentService.entity.BasicClass import TripRequest
 
 
 class WeatherSearchAgent:
@@ -45,18 +45,17 @@ class WeatherSearchAgent:
         self.agent = create_agent(
             model=self.llm,
             tools=tools,
-            response_format=WeatherSearchResponse,
             middleware=cast(Any, [self.tool_limiter, self.llm_limiter]),
         )
 
-    async def ainvoke(self, request: TripRequest) -> WeatherSearchResponse:
+    async def ainvoke(self, request: TripRequest) -> str:
         """执行一次天气查询并返回中文摘要。
 
         参数:
             request: 结构化 TripRequest 请求对象。
 
         返回值:
-            WeatherSearchResponse: 天气结构化结果和补充信息。
+            str: 模型与工具链路原始输出字符串。
         """
         # 将 TripRequest 转成结构化提示词输入，直接喂给模型。
         user_prompt = WEATHER_AGENT_USER_PROMPT.format(
@@ -73,15 +72,4 @@ class WeatherSearchAgent:
                 ]
             }
         )
-
-        if not isinstance(tool_result, dict):
-            return WeatherSearchResponse(weather_info=[], message="")
-
-        structured = tool_result.get("structured_response")
-        if structured is None:
-            return WeatherSearchResponse(weather_info=[], message="")
-
-        if isinstance(structured, WeatherSearchResponse):
-            return structured
-
-        return WeatherSearchResponse.model_validate(structured)
+        return str(tool_result)
