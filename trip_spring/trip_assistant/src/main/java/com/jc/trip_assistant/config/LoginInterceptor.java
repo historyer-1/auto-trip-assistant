@@ -68,13 +68,13 @@ public class LoginInterceptor implements HandlerInterceptor {
      */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 从请求头读取Authorization，并提取Bearer token。
+        // 从请求头读取Authorization，并直接提取token。
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || authHeader.isBlank()) {
             writeUnauthorized(response, "缺少有效的Authorization令牌");
             return false;
         }
-        String token = authHeader.substring(7).trim();
+        String token = authHeader.trim();
         if (token.isEmpty()) {
             writeUnauthorized(response, "令牌不能为空");
             return false;

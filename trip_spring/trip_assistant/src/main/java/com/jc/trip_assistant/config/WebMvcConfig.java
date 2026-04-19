@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     /**
-     * 登录拦截器实例。
+     * 登录拦截器。
      */
     private final LoginInterceptor loginInterceptor;
 
@@ -33,7 +33,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 拦截所有API请求，仅放行登录相关接口。
         registry.addInterceptor(loginInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/auth/send-code", "/api/auth/login");

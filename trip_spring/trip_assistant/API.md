@@ -1,165 +1,222 @@
-# Trip Assistant 接口文档
+# Trip Assistant 后端 API 文档
 
-## 1. 访问方式
-
-- 协议：`HTTP/1.1`
-- 基础地址：`http://localhost:8080`
-- 内容类型：`application/json`（页面路由除外）
-- 统一返回：所有业务接口使用 `Result<T>` 包装
-- 认证方式：`JWT Bearer Token`
-
-## 2. 统一返回对象 `Result<T>`
-
-### 2.1 字段说明
-
-| 字段 | 类型 | 必有 | 说明 |
-|---|---|---|---|
-| code | int | 是 | 业务码，`0` 表示成功 |
-| message | string | 是 | 业务提示信息 |
-| data | object/array/null | 是 | 业务数据 |
-
-### 2.2 常用业务码
-
-| code | 说明 |
-|---|---|
-| 0 | 成功 |
-| 400 | 参数错误/校验失败 |
-| 401 | 未登录或登录失效 |
-| 404 | 资源不存在 |
-| 500 | 服务内部错误 |
-
-## 3. 页面路由
-
-> 页面路由返回 HTML 模板，不返回业务 JSON。
-
-| 页面 | 方法 | 路径 | 返回 | 说明 |
-|---|---|---|---|---|
-| 首页 | GET | `/` | `redirect:/login` | 统一入口 |
-| 登录页 | GET | `/login` | `login` 模板 | 登录页面 |
-| 行程看板 | GET | `/trip/dashboard` | `dashboard` 模板 | 看板页面 |
-
-## 4. 认证与登录接口
-
-### 4.1 发送邮箱验证码
-
-- 方法：`POST`
-- 路径：`/api/auth/send-code`
-- 认证：不需要 token
-
-请求体：
+本文档面向前端开发，描述当前后端已提供接口。所有接口统一返回结构：
 
 ```json
 {
-  "email": "tester@example.com"
+  "code": 0,
+  "message": "success",
+  "data": {}
 }
 ```
 
-说明：
-- 验证码通过邮件发送。
-- 验证码会输出到后端日志，便于开发调试。
-- Redis 存储键：`auth:code:{email}`。
-- 过期时间：`3 分钟`。
+- `code=0` 表示成功
+- `code!=0` 表示失败
 
-### 4.2 邮箱验证码登录
+## 1. 认证模块
 
-- 方法：`POST`
-- 路径：`/api/auth/login`
-- 认证：不需要 token
-
-请求体：
+### 1.1 发送邮箱验证码
+- 路径：`POST /api/auth/send-code`
+- 鉴权：否
+- 请求体：
 
 ```json
 {
-  "email": "tester@example.com",
+  "email": "user@example.com"
+}
+```
+
+- 关键字段说明：
+- `email`：邮箱，必填
+
+- 成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "邮件发送成功",
+  "data": null
+}
+```
+
+### 1.2 邮箱验证码登录
+- 路径：`POST /api/auth/login`
+- 鉴权：否
+- 请求体：
+
+```json
+{
+  "email": "user@example.com",
   "code": "123456"
 }
 ```
 
-响应体 `data`：
+- 关键字段说明：
+- `email`：邮箱，必填
+- `code`：6位数字验证码，必填
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| token | string | JWT令牌 |
-| userId | long | 用户ID |
-| email | string | 用户邮箱 |
-| nickname | string | 用户昵称 |
+- 成功响应示例：
 
-说明：
-- 先校验 Redis 中的邮箱验证码。
-- 用户存在则直接登录，不存在则自动创建用户后登录。
-- JWT 会写入 Redis：`auth:token:{token}`。
-- 过期时间：`30 分钟`。
-
-### 4.3 查询当前用户
-
-- 方法：`GET`
-- 路径：`/api/auth/me`
-- 认证：需要 token
-
-请求头：
-
-```text
-Authorization: Bearer <token>
+```json
+{
+  "code": 0,
+  "message": "登录成功",
+  "data": {
+    "token": "<JWT_TOKEN>",
+    "userId": 1,
+    "email": "user@example.com",
+    "nickname": "用户abc123"
+  }
+}
 ```
 
-### 4.4 退出登录
+### 1.3 查询当前登录用户
+- 路径：`GET /api/auth/me`
+- 鉴权：是
+- 请求头：
+- `Authorization: <JWT_TOKEN>`
 
-- 方法：`POST`
-- 路径：`/api/auth/logout`
-- 认证：需要 token
+- 成功响应示例：
 
-请求头：
-
-```text
-Authorization: Bearer <token>
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "userId": 1,
+    "email": "user@example.com",
+    "nickname": "用户abc123"
+  }
+}
 ```
 
-说明：
-- 退出时删除 Redis 中的 token，令牌立即失效。
+### 1.4 退出登录
+- 路径：`POST /api/auth/logout`
+- 鉴权：是
+- 请求头：
+- `Authorization: <JWT_TOKEN>`
 
-## 5. 业务接口鉴权规则
+- 成功响应示例：
 
-- 除 `/api/auth/send-code` 与 `/api/auth/login` 外，其余 `/api/**` 接口都必须携带 JWT。
-- 拦截器：`LoginInterceptor`。
-- 放行条件：
-  - 请求头存在 `Authorization: Bearer <token>`。
-  - JWT 解析成功且未过期。
-  - Redis 中存在对应 `auth:token:{token}` 会话键。
-- 不满足条件时，统一返回：`Result.fail(401, "...")`。
-
-## 6. 前端对 token 的处理约定
-
-- 登录成功后将 `data.token` 保存到本地存储。
-- 请求 `/api/**` 时（除发送验证码与登录），自动添加请求头：
-
-```text
-Authorization: Bearer <token>
+```json
+{
+  "code": 0,
+  "message": "退出登录成功",
+  "data": null
+}
 ```
 
-- 收到 `401` 后清理本地 token 并跳转登录页。
-- 退出登录时调用 `/api/auth/logout`，并清理本地 token。
+## 2. 行程模块
 
-## 7. 数据库与表结构
+### 2.1 提交行程规划请求
+- 路径：`POST /api/agent/trip/submit`
+- 鉴权：是
+- 请求头：
+- `Authorization: <JWT_TOKEN>`
 
-数据库配置见 `application.yaml`，用户表结构如下：
+- 请求体：
 
-```sql
-CREATE TABLE IF NOT EXISTS t_user (
-    id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '用户主键ID',
-    email VARCHAR(128) NOT NULL UNIQUE COMMENT '登录邮箱，唯一',
-    nickname VARCHAR(64) NOT NULL COMMENT '用户昵称',
-    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+```json
+{
+  "city": "杭州",
+  "start_date": "2026-05-01",
+  "end_date": "2026-05-03",
+  "preference": "自然风景",
+  "accommodation": "舒适型酒店",
+  "transportation": "地铁+步行",
+  "budget": 3000,
+  "user_input": "希望安排轻松节奏"
+}
 ```
 
-初始化脚本位置：`src/main/resources/sql/schema.sql`
+- 关键字段说明：
+- `city`：目的地城市，必填
+- `start_date`：开始日期，必填
+- `end_date`：结束日期，必填
+- `budget`：预算，非负整数
+- 其余字段均为可选偏好补充
 
-## 8. 接口实现检查清单
+- 成功响应示例：
 
-- [x] `/api/auth/send-code` (POST)：邮箱校验 + 邮件发送 + Redis验证码缓存
-- [x] `/api/auth/login` (POST)：验证码校验 + 用户查询/新增 + JWT签发 + Redis登录态缓存
-- [x] `/api/auth/me` (GET)：基于 token 返回当前用户
-- [x] `/api/auth/logout` (POST)：清理 token 登录态
-- [x] 登录拦截器：除登录接口外，全部要求 Bearer Token
-- [x] 前端：除登录外统一携带 token
+```json
+{
+  "code": 0,
+  "message": "请求已进入队列，请稍后查询",
+  "data": "c9d8d6f8f4f14c8ea31f5f5948debe85"
+}
+```
+
+- `data` 即 `requestId`。
+
+### 2.2 按 requestId 查询单次行程结果
+- 路径：`GET /api/agent/trip/query?requestId={requestId}`
+- 鉴权：是
+- 请求头：
+- `Authorization: <JWT_TOKEN>`
+
+- 请求参数：
+- `requestId`：提交接口返回的请求唯一ID
+
+- 成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "requestId": "c9d8d6f8f4f14c8ea31f5f5948debe85",
+    "status": "SUCCESS",
+    "errorMessage": null,
+    "tripPlan": {
+      "city": "杭州",
+      "start_date": "2026-05-01",
+      "end_date": "2026-05-03",
+      "days": [],
+      "weather_info": [],
+      "overall_suggestions": "...",
+      "budget": {}
+    }
+  }
+}
+```
+
+- `status` 可能值：`PENDING`、`SUCCESS`、`FAILED`
+
+### 2.3 分页查询当前用户历史行程计划列表
+- 路径：`GET /api/agent/trip/plans?page={page}&size={size}`
+- 鉴权：是
+- 请求头：
+- `Authorization: <JWT_TOKEN>`
+
+- 请求参数：
+- `page`：页码，从 1 开始，默认 1
+- `size`：每页条数，默认 10，范围 1~100
+
+- 返回说明：
+- 返回当前登录用户的历史 `TripPlan` 列表（仅成功生成的行程）
+- 按更新时间倒序返回
+
+- 成功响应示例：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": [
+    {
+      "city": "杭州",
+      "start_date": "2026-05-01",
+      "end_date": "2026-05-03",
+      "days": [],
+      "weather_info": [],
+      "overall_suggestions": "...",
+      "budget": {}
+    }
+  ]
+}
+```
+
+## 3. 前端对接建议
+
+- 登录成功后，将 `token` 保存到本地，并在后续鉴权接口请求头携带：`Authorization: <JWT_TOKEN>`。
+- 提交行程后先拿到 `requestId`，可轮询 `/api/agent/trip/query` 获取状态；同时可通过 `/api/agent/trip/plans` 分页展示历史行程。

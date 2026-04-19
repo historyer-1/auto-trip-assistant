@@ -41,8 +41,10 @@ trip_spring/trip_assistant/src/main/resources/application-*.properties
 # =========================
 .idea/
 *.iml
+*.yaml
 
 # Keep sharable VS Code launch configs, ignore user-private variants
-.vscode
+*.vscode
 
 prompt.txt
+
