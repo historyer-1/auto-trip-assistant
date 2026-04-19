@@ -1,0 +1,4 @@
+com.jc:trip_assistant:jar:0.0.1-SNAPSHOT
++- io.jsonwebtoken:jjwt-api:jar:0.11.5:compile
++- io.jsonwebtoken:jjwt-impl:jar:0.12.6:runtime
+\- io.jsonwebtoken:jjwt-jackson:jar:0.11.5:runtime

@@ -45,10 +45,7 @@ public class JwtUtil {
         Instant now = Instant.now();
         Instant expireAt = now.plus(expireMinutes, ChronoUnit.MINUTES);
         // 基于业务载荷构建并签发JWT。
-        return Jwts.builder()
-                .setClaims(claims)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(expireAt))
+        return Jwts.builder().claims(claims).issuedAt(Date.from(now)).expiration(Date.from(expireAt))
                 .signWith(key)
                 .compact();
     }
@@ -62,11 +59,11 @@ public class JwtUtil {
     public Claims parseToken(String token) {
         // 使用同一密钥进行签名校验和载荷解析。
         SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-        Jws<Claims> claimsJws = Jwts.parserBuilder()
-                .setSigningKey(key)
+        Jws<Claims> claimsJws = Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token);
+                .parseSignedClaims(token);
         // 返回令牌中的业务声明供调用方使用。
-        return claimsJws.getBody();
+        return claimsJws.getPayload();
     }
 }

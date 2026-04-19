@@ -9,17 +9,12 @@ import com.jc.trip_assistant.entity.User;
 import com.jc.trip_assistant.service.LoginService;
 import com.jc.trip_assistant.util.JwtUtil;
 import com.jc.trip_assistant.util.MailUtil;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
-
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -51,7 +46,7 @@ public class LoginServiceImpl implements LoginService {
     /**
      * 登录令牌过期时间。
      */
-    private static final Duration TOKEN_TTL = Duration.ofMinutes(30);
+    private static final Duration TOKEN_TTL = Duration.ofMinutes(300);
 
     /**
      * 用户数据访问对象。
@@ -62,11 +57,6 @@ public class LoginServiceImpl implements LoginService {
      * Redis操作模板。
      */
     private final StringRedisTemplate stringRedisTemplate;
-
-    /**
-     * 邮件发送器。
-     */
-    private final JavaMailSender javaMailSender;
 
     /**
      * JWT工具对象。
@@ -99,7 +89,6 @@ public class LoginServiceImpl implements LoginService {
                             JwtUtil jwtUtil) {
         this.userDao = userDao;
         this.stringRedisTemplate = stringRedisTemplate;
-        this.javaMailSender = javaMailSender;
         this.jwtUtil = jwtUtil;
     }
 
@@ -164,7 +153,7 @@ public class LoginServiceImpl implements LoginService {
         claims.put("nickname", user.getNickname());
         String token = jwtUtil.generateToken(claims);
 
-        // 将令牌写入Redis用于服务端会话校验，并设置30分钟过期。
+        // 将令牌写入Redis用于服务端会话校验，并设置过期。
         stringRedisTemplate.opsForValue().set(buildTokenKey(token), String.valueOf(user.getId()), TOKEN_TTL);
 
         // 登录成功后删除验证码，避免验证码重复使用。

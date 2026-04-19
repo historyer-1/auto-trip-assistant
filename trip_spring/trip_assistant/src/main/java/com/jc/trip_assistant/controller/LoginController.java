@@ -137,25 +137,25 @@ public class LoginController {
     @ResponseBody
     public Result<Object> logout(HttpServletRequest request) {
         // 提取token后交由Service清理Redis登录态。
-        String token = extractBearerToken(request);
+        String token = extractToken(request);
         return loginService.logout(token);
     }
 
     /**
-     * 从请求头提取Bearer令牌。
+     * 从请求头提取令牌。
      *
      * @param request HTTP请求对象
      * @return JWT令牌字符串
      */
-    private String extractBearerToken(HttpServletRequest request) {
-        // 读取Authorization请求头并校验Bearer前缀。
+    private String extractToken(HttpServletRequest request) {
+        // 读取Authorization请求头并直接取出token内容。
         String authorization = request.getHeader("Authorization");
-        if (authorization == null || !authorization.startsWith("Bearer ")) {
+        if (authorization == null || authorization.isBlank()) {
             throw new IllegalArgumentException("缺少有效的Authorization令牌");
         }
 
-        // 去除Bearer前缀并返回纯令牌内容。
-        String token = authorization.substring(7).trim();
+        // 直接使用请求头中的token字符串。
+        String token = authorization.trim();
         if (token.isEmpty()) {
             throw new IllegalArgumentException("令牌不能为空");
         }
