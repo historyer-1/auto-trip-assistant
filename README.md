@@ -72,11 +72,14 @@ kafka-topics --create --topic trip-agent-request --bootstrap-server 127.0.0.1:90
 2. 入口文件是 `python_agent/FastapiPan.py`，提供健康检查接口 `/health` 和行程接口 `POST /agent/query`。
 3. 安装依赖后在 `python_agent` 目录启动服务，默认监听 `8000` 端口。
 4. 如果地址或端口变化，请同步修改 Java 项目 `application.yaml` 中 `trip.agent.server-url`。
+5. Agent 采用“总编排 Agent + 多个领域 Agent”的方式拆分职责：景点、天气、酒店、餐饮分别并发检索，再由规划 Agent 汇总成最终行程。
+6. 工具层直接接入高德地图接口，结合本地 adcode 映射、参数校验和超时控制，保证检索结果真实可用且稳定。
+7. 规划阶段通过 Pydantic 模型、字段归一化和 JSON 修复兜底来约束模型输出，减少大模型格式漂移对接口和数据库的影响。
 
 Python Agent 启动示例：
 
 ```powershell
-Set-Location "D:\project\agent\helloagents\auto_trip_assistant\python_agent"
+Set-Location "你的项目位置\python_agent"
 pip install -r requirements.txt
 uvicorn FastapiPan:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -121,7 +124,7 @@ Python 子项目重点依赖：
 在 Windows PowerShell 中执行：
 
 ```powershell
-Set-Location "D:\project\agent\helloagents\auto_trip_assistant\trip_spring\trip_assistant"
+Set-Location "你的项目位置\trip_spring\trip_assistant"
 mvn spring-boot:run
 ```
 
@@ -154,7 +157,7 @@ mvn spring-boot:run
 ## 8. 代码检查与测试
 
 ```powershell
-Set-Location "D:\project\agent\helloagents\auto_trip_assistant\trip_spring\trip_assistant"
+Set-Location "你的项目位置\trip_spring\trip_assistant"
 mvn test
 ```
 
