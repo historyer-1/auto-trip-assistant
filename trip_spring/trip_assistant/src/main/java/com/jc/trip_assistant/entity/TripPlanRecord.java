@@ -38,6 +38,11 @@ public class TripPlanRecord {
     private String status;
 
     /**
+     * 重试次数。
+     */
+    private Integer retryCount;
+
+    /**
      * 失败原因。
      */
     private String errorMessage;
@@ -170,6 +175,26 @@ public class TripPlanRecord {
      */
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    /**
+     * 获取重试次数。
+     *
+     * @param 无
+     * @return 重试次数
+     */
+    public Integer getRetryCount() {
+        return retryCount;
+    }
+
+    /**
+     * 设置重试次数。
+     *
+     * @param retryCount 重试次数
+     * @return 无
+     */
+    public void setRetryCount(Integer retryCount) {
+        this.retryCount = retryCount;
     }
 
     /**

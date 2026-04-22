@@ -11,9 +11,9 @@ import com.jc.trip_assistant.entity.TripPlanRecord;
 import com.jc.trip_assistant.entity.TripRequest;
 import com.jc.trip_assistant.service.AgentTripService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -21,7 +21,6 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 
 /**
  * Agent行程服务实现，负责请求入队、消费处理、调用Agent并落库。
@@ -66,11 +65,6 @@ public class AgentTripServiceImpl implements AgentTripService {
     private final RestTemplate restTemplate;
 
     /**
-     * 行程任务线程池。
-     */
-    private final Executor tripTaskExecutor;
-
-    /**
      * Kafka主题。
      */
     private final String tripTopic;
@@ -87,7 +81,6 @@ public class AgentTripServiceImpl implements AgentTripService {
      * @param kafkaTemplate Kafka消息发送模板
      * @param objectMapper JSON工具
      * @param restTemplate HTTP客户端
-     * @param tripTaskExecutor 行程任务线程池
      * @param tripTopic Kafka主题
      * @param agentServerUrl Agent服务地址
      * @return 无
@@ -96,14 +89,12 @@ public class AgentTripServiceImpl implements AgentTripService {
                                 KafkaTemplate<String, String> kafkaTemplate,
                                 ObjectMapper objectMapper,
                                 RestTemplate restTemplate,
-                                @Qualifier("tripTaskExecutor") Executor tripTaskExecutor,
                                 @Value("${trip.kafka.topic}") String tripTopic,
                                 @Value("${trip.agent.server-url}") String agentServerUrl) {
         this.tripPlanDao = tripPlanDao;
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
         this.restTemplate = restTemplate;
-        this.tripTaskExecutor = tripTaskExecutor;
         this.tripTopic = tripTopic;
         this.agentServerUrl = agentServerUrl;
     }
@@ -126,6 +117,7 @@ public class AgentTripServiceImpl implements AgentTripService {
             record.setRequestId(requestId);
             record.setRequestJson(objectMapper.writeValueAsString(request));
             record.setStatus(STATUS_PENDING);
+            record.setRetryCount(0);
             tripPlanDao.insertPending(record);
 
             // 组装Kafka消息并发送到Topic。
@@ -137,7 +129,7 @@ public class AgentTripServiceImpl implements AgentTripService {
             return Result.success("请求已进入队列，请稍后查询", requestId);
         } catch (Exception ex) {
             log.error("提交行程请求失败，userId={}, requestId={}", userId, requestId, ex);
-            tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "请求入队失败：" + ex.getMessage());
+            tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "请求入队失败：" + ex.getMessage(), 0);
             return Result.fail(500, "提交请求失败：" + ex.getMessage());
         }
     }
@@ -212,15 +204,22 @@ public class AgentTripServiceImpl implements AgentTripService {
     }
 
     /**
-     * Kafka消费者入口，接收消息后交由线程池异步处理。
+     * Kafka消费者入口，接收消息后同步完成Agent调用和状态确认。
      *
      * @param payload Kafka消息内容
      * @return 无
      */
-    @KafkaListener(topics = "${trip.kafka.topic}")
-    public void consumeTripMessage(String payload) {
-        // Kafka监听线程只做接收与分发，耗时任务交给线程池处理。
-        tripTaskExecutor.execute(() -> processTripMessage(payload));
+    @KafkaListener(topics = "${trip.kafka.topic}",
+            concurrency = "${trip.kafka.listener-concurrency:4}",
+            containerFactory = "tripKafkaListenerContainerFactory")
+    public void consumeTripMessage(String payload, Acknowledgment acknowledgment) {
+        try {
+            processTripMessage(payload);
+        } catch (Exception ex) {
+            log.error("消费行程消息失败，payload={}", payload, ex);
+        } finally {
+            acknowledgment.acknowledge();
+        }
     }
 
     /**
@@ -235,21 +234,64 @@ public class AgentTripServiceImpl implements AgentTripService {
             // 反序列化消息并提取基础信息。
             AgentTripMessage message = objectMapper.readValue(payload, AgentTripMessage.class);
             requestId = message.getRequestId();
+            TripPlanRecord record = tripPlanDao.findByUserIdAndRequestId(message.getUserId(), requestId);
+            if (record == null) {
+                log.error("未找到对应的行程记录，userId={}, requestId={}", message.getUserId(), requestId);
+                return;
+            }
 
-            // 调用Agent服务获取行程结果，响应按JSON字符串保存到数据库。
-            String planJson = restTemplate.postForObject(agentServerUrl, message.getTripRequest(), String.class);
-            if (planJson == null || planJson.isBlank()) {
-                tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "Agent返回为空");
+            int retryCount = record.getRetryCount() == null ? 0 : record.getRetryCount();
+            TripProcessingResult processingResult = callAgentWithRetry(message, requestId, retryCount);
+            if (processingResult == null) {
                 return;
             }
 
             // 处理成功后更新数据库状态与结果。
-            tripPlanDao.updateResult(requestId, STATUS_SUCCESS, planJson, null);
+            tripPlanDao.updateResult(requestId, STATUS_SUCCESS, processingResult.planJson(), null, processingResult.retryCount());
         } catch (Exception ex) {
             log.error("消费行程消息失败，requestId={}", requestId, ex);
             if (!requestId.isBlank()) {
-                tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "消费失败：" + ex.getMessage());
+                tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "消费失败：" + ex.getMessage(), 1);
             }
         }
+    }
+
+    /**
+     * 调用Agent服务，首次失败时将记录标记为PENDING并重试一次。
+     *
+     * @param message Kafka消息
+     * @param requestId 请求唯一ID
+     * @param retryCount 当前已重试次数
+     * @return 行程结果JSON
+     */
+    private TripProcessingResult callAgentWithRetry(AgentTripMessage message, String requestId, int retryCount) {
+        int attempt = Math.min(retryCount, 1);
+        while (attempt <= 1) {
+            try {
+                String planJson = restTemplate.postForObject(agentServerUrl, message.getTripRequest(), String.class);
+                if (planJson == null || planJson.isBlank()) {
+                    throw new IllegalStateException("Agent返回为空");
+                }
+                return new TripProcessingResult(planJson, attempt);
+            } catch (Exception ex) {
+                if (attempt == 0) {
+                    tripPlanDao.updateResult(requestId, STATUS_PENDING, null, "首次消费失败，准备重试：" + ex.getMessage(), 1);
+                    attempt = 1;
+                    continue;
+                }
+                tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "消费失败：" + ex.getMessage(), 1);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Kafka消息处理结果。
+     *
+     * @param planJson 行程结果JSON
+     * @param retryCount 最终使用的重试次数
+     */
+    private record TripProcessingResult(String planJson, int retryCount) {
     }
 }

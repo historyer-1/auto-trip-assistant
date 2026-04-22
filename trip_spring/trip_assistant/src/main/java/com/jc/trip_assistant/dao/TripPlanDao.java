@@ -22,8 +22,8 @@ public interface TripPlanDao {
      * @return 受影响行数
      */
     @Insert("""
-            INSERT INTO t_trip_plan(user_id, request_id, request_json, status)
-            VALUES(#{userId}, #{requestId}, #{requestJson}, #{status})
+            INSERT INTO t_trip_plan(user_id, request_id, request_json, status, retry_count)
+            VALUES(#{userId}, #{requestId}, #{requestJson}, #{status}, #{retryCount})
             """)
     int insertPending(TripPlanRecord record);
 
@@ -40,13 +40,15 @@ public interface TripPlanDao {
             UPDATE t_trip_plan
             SET status = #{status},
                 plan_json = #{planJson},
-                error_message = #{errorMessage}
+                error_message = #{errorMessage},
+                retry_count = #{retryCount}
             WHERE request_id = #{requestId}
             """)
     int updateResult(@Param("requestId") String requestId,
                      @Param("status") String status,
                      @Param("planJson") String planJson,
-                     @Param("errorMessage") String errorMessage);
+                     @Param("errorMessage") String errorMessage,
+                     @Param("retryCount") int retryCount);
 
     /**
      * 按用户和请求ID查询记录。
@@ -56,7 +58,7 @@ public interface TripPlanDao {
      * @return 行程请求记录
      */
     @Select("""
-            SELECT id, user_id, request_id, request_json, plan_json, status, error_message, create_time, update_time
+            SELECT id, user_id, request_id, request_json, plan_json, status, retry_count, error_message, create_time, update_time
             FROM t_trip_plan
             WHERE user_id = #{userId} AND request_id = #{requestId}
             LIMIT 1
@@ -64,24 +66,24 @@ public interface TripPlanDao {
     TripPlanRecord findByUserIdAndRequestId(@Param("userId") Long userId,
                                             @Param("requestId") String requestId);
 
-                /**
-                 * 分页查询用户成功生成的行程结果JSON。
-                 *
-                 * @param userId 用户ID
-                 * @param offset 偏移量
-                 * @param size 每页条数
-                 * @return 行程结果JSON列表
-                 */
-                @Select("""
-                                                SELECT plan_json
-                                                FROM t_trip_plan
-                                                WHERE user_id = #{userId}
-                                                        AND status = 'SUCCESS'
-                                                        AND plan_json IS NOT NULL
-                                                ORDER BY update_time DESC, id DESC
-                                                LIMIT #{size} OFFSET #{offset}
-                                                """)
-                List<String> findSuccessPlanJsonListByUserId(@Param("userId") Long userId,
-                                                                                                                                                                                                 @Param("offset") int offset,
-                                                                                                                                                                                                 @Param("size") int size);
+    /**
+     * 分页查询用户成功生成的行程结果JSON。
+     *
+     * @param userId 用户ID
+     * @param offset 偏移量
+     * @param size 每页条数
+     * @return 行程结果JSON列表
+     */
+    @Select("""
+            SELECT plan_json
+            FROM t_trip_plan
+            WHERE user_id = #{userId}
+                    AND status = 'SUCCESS'
+                    AND plan_json IS NOT NULL
+            ORDER BY update_time DESC, id DESC
+            LIMIT #{size} OFFSET #{offset}
+            """)
+    List<String> findSuccessPlanJsonListByUserId(@Param("userId") Long userId,
+                                                 @Param("offset") int offset,
+                                                 @Param("size") int size);
 }
