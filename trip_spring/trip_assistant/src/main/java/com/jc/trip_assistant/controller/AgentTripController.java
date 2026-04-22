@@ -69,7 +69,7 @@ public class AgentTripController {
      *
      * @param page 页码，从1开始
      * @param size 每页条数
-     * @return TripPlan列表
+     * @rett_trip_planurn TripPlan列表
      */
     @GetMapping("/trip/plans")
     public Result<List<TripPlan>> listCurrentUserTripPlans(@RequestParam(value = "page", defaultValue = "1") Integer page,

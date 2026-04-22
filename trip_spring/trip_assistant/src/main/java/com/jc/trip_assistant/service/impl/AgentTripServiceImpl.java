@@ -15,7 +15,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -44,6 +47,16 @@ public class AgentTripServiceImpl implements AgentTripService {
      * 失败状态。
      */
     private static final String STATUS_FAILED = "FAILED";
+
+    /**
+     * Agent调用最大重试次数（仅用于中断类错误）。
+     */
+    private static final int AGENT_MAX_RETRY_ATTEMPTS = 2;
+
+    /**
+     * Agent调用重试间隔（毫秒）。
+     */
+    private static final long AGENT_RETRY_BACKOFF_MILLIS = 1000L;
 
     /**
      * 行程结果DAO。
@@ -218,26 +231,51 @@ public class AgentTripServiceImpl implements AgentTripService {
      * @return 无
      */
     @KafkaListener(topics = "${trip.kafka.topic}")
-    public void consumeTripMessage(String payload) {
-        // Kafka监听线程只做接收与分发，耗时任务交给线程池处理。
-        tripTaskExecutor.execute(() -> processTripMessage(payload));
+    public void consumeTripMessage(String payload, Acknowledgment acknowledgment) {
+        String requestId = "";
+        try {
+            // 先解析请求ID并将状态更新为PENDING，确保状态持久化后再确认消息。
+            AgentTripMessage message = objectMapper.readValue(payload, AgentTripMessage.class);
+            requestId = message.getRequestId();
+
+            if (requestId == null || requestId.isBlank()) {
+                log.error("消费行程消息失败，请求ID为空，payload={}", payload);
+                acknowledgment.acknowledge();
+                return;
+            }
+
+            tripPlanDao.updateResult(requestId, STATUS_PENDING, null, null);
+            acknowledgment.acknowledge();
+
+            // Kafka监听线程只做接收与分发，耗时任务交给线程池处理。
+            tripTaskExecutor.execute(() -> processTripMessage(message));
+        } catch (JsonProcessingException ex) {
+            log.error("消费行程消息失败，payload不是有效JSON，payload={}", payload, ex);
+            acknowledgment.acknowledge();
+        } catch (Exception ex) {
+            // 未能完成PENDING更新时不确认消息，让Kafka重新投递。
+            log.error("消费行程消息失败，未确认Kafka消息，payload={}", payload, ex);
+            if (requestId != null && !requestId.isBlank()) {
+                try {
+                    tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "任务分发失败：" + ex.getMessage());
+                } catch (Exception daoEx) {
+                    log.error("更新任务失败状态异常，requestId={}", requestId, daoEx);
+                }
+            }
+        }
     }
 
     /**
      * 处理Kafka消息并调用Agent服务。
      *
-     * @param payload Kafka消息内容
+        * @param message Kafka消息对象
      * @return 无
      */
-    private void processTripMessage(String payload) {
-        String requestId = "";
+    private void processTripMessage(AgentTripMessage message) {
+        String requestId = message.getRequestId();
         try {
-            // 反序列化消息并提取基础信息。
-            AgentTripMessage message = objectMapper.readValue(payload, AgentTripMessage.class);
-            requestId = message.getRequestId();
-
             // 调用Agent服务获取行程结果，响应按JSON字符串保存到数据库。
-            String planJson = restTemplate.postForObject(agentServerUrl, message.getTripRequest(), String.class);
+            String planJson = callAgentWithRetry(message);
             if (planJson == null || planJson.isBlank()) {
                 tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "Agent返回为空");
                 return;
@@ -245,11 +283,51 @@ public class AgentTripServiceImpl implements AgentTripService {
 
             // 处理成功后更新数据库状态与结果。
             tripPlanDao.updateResult(requestId, STATUS_SUCCESS, planJson, null);
+        } catch (HttpStatusCodeException ex) {
+            // Agent服务已返回错误响应，直接失败，不重试。
+            log.error("Agent服务返回错误，requestId={}, status={}", requestId, ex.getStatusCode(), ex);
+            if (requestId != null && !requestId.isBlank()) {
+                tripPlanDao.updateResult(requestId, STATUS_FAILED, null,
+                        "Agent返回错误：HTTP " + ex.getStatusCode().value());
+            }
         } catch (Exception ex) {
             log.error("消费行程消息失败，requestId={}", requestId, ex);
-            if (!requestId.isBlank()) {
+            if (requestId != null && !requestId.isBlank()) {
                 tripPlanDao.updateResult(requestId, STATUS_FAILED, null, "消费失败：" + ex.getMessage());
             }
         }
+    }
+
+    /**
+     * 调用Agent服务，网络中断类异常执行有限次重试。
+     *
+     * @param message 行程请求消息
+     * @return Agent返回JSON
+     */
+    private String callAgentWithRetry(AgentTripMessage message) {
+        int attempt = 0;
+        while (attempt < AGENT_MAX_RETRY_ATTEMPTS) {
+            attempt++;
+            try {
+                return restTemplate.postForObject(agentServerUrl, message.getTripRequest(), String.class);
+            } catch (HttpStatusCodeException ex) {
+                // Agent明确返回HTTP错误，不重试。
+                throw ex;
+            } catch (ResourceAccessException ex) {
+                // 连接中断、超时等场景允许重试。
+                if (attempt >= AGENT_MAX_RETRY_ATTEMPTS) {
+                    throw ex;
+                }
+                log.warn("调用Agent服务中断，将进行重试，requestId={}, attempt={}",
+                        message.getRequestId(), attempt, ex);
+                try {
+                    Thread.sleep(AGENT_RETRY_BACKOFF_MILLIS);
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Agent重试等待被中断", interruptedException);
+                }
+            }
+        }
+        throw new IllegalStateException("调用Agent服务失败：达到最大重试次数");
     }
 }
